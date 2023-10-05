@@ -212,6 +212,17 @@ module.exports = {
         }
     },
 
+    getAllUsers: async (req, res) => {
+        const user = req.user
+
+        try {
+            const allUsers = await userDb.find()
+            res.send({error: false, message: 'Users retrieved', data: allUsers})
+
+        } catch (error) {
+            res.send({error: true, message: 'Error retrieving users', data: null});
+        }
+    }
 
 
 }
