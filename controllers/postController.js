@@ -83,6 +83,18 @@ module.exports = {
         }
 
     },
+    getSinglePost: async (req, res) => {
+        const postId = req.params
+
+        try {
+            const post = await postDb.find({_id: postId})
+            res.send({error: false, message: 'Post retrieved', data: post});
+
+        } catch (error) {
+            res.send({error: true, message: 'Post not found', data: null});
+        }
+
+    },
     getAllPosts: async (req, res) => {
         const user = req.user
 
@@ -93,6 +105,29 @@ module.exports = {
         } catch (error) {
             res.send({error: true, message: 'Posts not found', data: null});
         }
+    },
+
+    updatePost: async (req, res) => {
+        const {post} = req.body
+        const user = req.user
+
+        console.log('post', post)
+
+        const updatedPost = await postDb.findOneAndUpdate(
+            {_id: post._id},
+            {$set: {title: post.title, image: post.image} },
+            {new: true}
+        )
+
+        const posts = await postDb.find()
+        const userPosts = await postDb.find({userId: user.id})
+
+        res.send({
+            error: false,
+            message: 'User post updated',
+            data: {posts, userPosts},
+        })
+
     },
 
 

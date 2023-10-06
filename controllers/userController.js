@@ -175,8 +175,6 @@ module.exports = {
         const {updatedBio} = req.body
         const user = req.user
 
-        console.log('updatedBio', updatedBio)
-
         const updatedUser = await userDb.findOneAndUpdate(
             {_id: user.id},
             {$set: {bio: updatedBio}},
@@ -190,11 +188,33 @@ module.exports = {
         })
 
     },
-    getUser: async (req, res) => {
+    getCurrentUser: async (req, res) => {
         const user = req.user
 
         try {
             const userInDb = await userDb.findOne({_id: user.id})
+            res.send({
+                error: false,
+                message: 'User found',
+                data: {
+                    username: userInDb.username,
+                    image: userInDb.image,
+                }
+            })
+
+        } catch (error) {
+            res.send({
+                error: true,
+                message: 'User not found',
+                data: null});
+        }
+    },
+
+    getOtherUser: async (req, res) => {
+        const {userId} = req.body
+
+        try {
+            const userInDb = await userDb.findOne({_id: userId})
             res.send({
                 error: false,
                 message: 'User found',
