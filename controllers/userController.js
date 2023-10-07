@@ -121,7 +121,6 @@ module.exports = {
         })
 
     },
-
     updateUserPassword: async (req, res) => {
         const { password, newPassword } = req.body
         const user = req.user
@@ -209,7 +208,6 @@ module.exports = {
                 data: null});
         }
     },
-
     getOtherUser: async (req, res) => {
         const {userId} = req.body
 
@@ -231,18 +229,20 @@ module.exports = {
                 data: null});
         }
     },
-
     getAllUsers: async (req, res) => {
-        const user = req.user
-
         try {
             const allUsers = await userDb.find()
-            res.send({error: false, message: 'Users retrieved', data: allUsers})
+
+            const users = allUsers.map(user => ({
+                username: user.username,
+                image: user.image,
+                bio: user.bio || null,
+            }))
+
+            res.send({error: false, message: 'Users retrieved', data: users})
 
         } catch (error) {
             res.send({error: true, message: 'Error retrieving users', data: null});
         }
     }
-
-
 }

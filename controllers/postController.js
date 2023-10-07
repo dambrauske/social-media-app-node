@@ -1,8 +1,4 @@
 const postDb = require('../schemas/postSchema')
-const userDb = require('../schemas/userSchema')
-const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
-
 
 module.exports = {
     addPost: async (req, res) => {
@@ -36,8 +32,8 @@ module.exports = {
 
         try {
             newPost.save()
-            const userPosts = await postDb.find({userId: user.id})
-            res.send({error: false, message: 'Post saved', data: userPosts})
+            const posts = await postDb.find()
+            res.send({error: false, message: 'Post saved', data: posts})
 
         } catch (error) {
             res.send({error: true, message: 'Error', data: null,})
@@ -62,26 +58,13 @@ module.exports = {
 
         try {
             await postDb.findOneAndDelete({_id: postId})
-            const userPosts = await postDb.find({userId: user.id})
             const allPosts = await postDb.find()
-            res.send({error: false, message: 'Post deleted', data: {userPosts, allPosts}});
+            res.send({error: false, message: 'Post deleted', data: allPosts});
 
         } catch (error) {
             console.log(error)
             res.send({error: true, message: 'An error occurred', data: null})
         }
-    },
-    getUserPosts: async (req, res) => {
-        const user = req.user
-
-        try {
-            const userPosts = await postDb.find({userId: user.id})
-            res.send({error: false, message: 'Posts retrieved', data: userPosts});
-
-        } catch (error) {
-            res.send({error: true, message: 'Posts not found', data: null});
-        }
-
     },
     getSinglePost: async (req, res) => {
         const postId = req.params
@@ -106,7 +89,6 @@ module.exports = {
             res.send({error: true, message: 'Posts not found', data: null});
         }
     },
-
     updatePost: async (req, res) => {
         const {post} = req.body
         const user = req.user
@@ -129,6 +111,4 @@ module.exports = {
         })
 
     },
-
-
 }

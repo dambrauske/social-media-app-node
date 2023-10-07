@@ -16,7 +16,6 @@ const {
     addPost,
     deletePost,
     getAllPosts,
-    getUserPosts,
     updatePost,
     getSinglePost,
 } = require('../controllers/postController')
@@ -65,7 +64,6 @@ router.post('/addPost', validateToken, validatePost, addPost)
 router.post('/deletePost', validateToken, deletePost)
 router.post('/updatePost', validateToken, updatePost)
 router.get('/posts', validateToken, getAllPosts)
-router.get('/userPosts', validateToken, getUserPosts)
 router.get('/post/:postId', validateToken, getSinglePost)
 router.post('/getUser', validateToken, getOtherUser)
 
