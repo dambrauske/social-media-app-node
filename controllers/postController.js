@@ -5,10 +5,6 @@ module.exports = {
         const {image, title} = req.body
         const user = req.user
 
-        console.log('image from front', image)
-        console.log('title from front', title)
-        console.log('user', user)
-
         const fullDate = new Date()
         const day = String(fullDate.getDate()).padStart(2, '0')
         const month = String(fullDate.getMonth() + 1).padStart(2, '0')
@@ -19,8 +15,6 @@ module.exports = {
 
         const date = `${year}-${month}-${day}`
         const time = `${hours}:${minutes}:${seconds}`
-
-        console.log(`${date} ${time}`)
 
         const newPost = new postDb({
             username: user.username,
@@ -33,7 +27,12 @@ module.exports = {
         try {
             newPost.save()
             const posts = await postDb.find()
-            res.send({error: false, message: 'Post saved', data: posts})
+            const sortedByTime = posts.sort((objA, objB) => {
+                return new Date(objB.date) - new Date(objA.date)
+            })
+
+            console.log('all posts from db afted one added', posts)
+            res.send({error: false, message: 'Post saved', data: sortedByTime})
 
         } catch (error) {
             res.send({error: true, message: 'Error', data: null,})
@@ -59,7 +58,10 @@ module.exports = {
         try {
             await postDb.findOneAndDelete({_id: postId})
             const allPosts = await postDb.find()
-            res.send({error: false, message: 'Post deleted', data: allPosts});
+            const sortedByTime = allPosts.sort((objA, objB) => {
+                return new Date(objB.date) - new Date(objA.date)
+            })
+            res.send({error: false, message: 'Post deleted', data: sortedByTime});
 
         } catch (error) {
             console.log(error)
@@ -67,14 +69,19 @@ module.exports = {
         }
     },
     getSinglePost: async (req, res) => {
-        const postId = req.params
+
+        console.log('get single post req')
+        const { postId }  = req.params
+        console.log('postId', postId)
 
         try {
-            const post = await postDb.find({_id: postId})
+            const post = await postDb.findOne({_id: postId})
+            console.log('post find', post)
             res.send({error: false, message: 'Post retrieved', data: post});
 
         } catch (error) {
-            res.send({error: true, message: 'Post not found', data: null});
+            res.send({error: true, message: 'Post not found', data: null})
+            console.log('error', error)
         }
 
     },
@@ -83,7 +90,10 @@ module.exports = {
 
         try {
             const posts = await postDb.find()
-            res.send({error: false, message: 'Posts retrieved', data: posts});
+            const sortedByTime = posts.sort((objA, objB) => {
+                return new Date(objB.date) - new Date(objA.date)
+            })
+            res.send({error: false, message: 'Posts retrieved', data: sortedByTime});
 
         } catch (error) {
             res.send({error: true, message: 'Posts not found', data: null});
@@ -102,12 +112,19 @@ module.exports = {
         )
 
         const posts = await postDb.find()
+        const allPostsSortedByTime = posts.sort((objA, objB) => {
+            return new Date(objB.date) - new Date(objA.date)
+        })
+
         const userPosts = await postDb.find({userId: user.id})
+        const userpostsSortedByTime = userPosts.sort((objA, objB) => {
+            return new Date(objB.date) - new Date(objA.date)
+        })
 
         res.send({
             error: false,
             message: 'User post updated',
-            data: {posts, userPosts},
+            data: {allPostsSortedByTime, userpostsSortedByTime},
         })
 
     },
