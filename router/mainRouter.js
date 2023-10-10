@@ -18,39 +18,18 @@ const {
     getAllPosts,
     updatePost,
     getSinglePost,
+    addComment,
+    getPostComments,
 } = require('../controllers/postController')
 
-const {
-    validateToken
-} = require('../middleware/tokenValidation')
-
-const {
-    validateUsername
-} = require('../middleware/usernameValidation')
-
-const {
-    validatePassword
-} = require('../middleware/passwordValidation')
-
-const {
-    validateUpdatePassword
-} = require('../middleware/passwordUpdateValidation')
-
-const {
-    validateEmail
-} = require('../middleware/emailValidation')
-
-const {
-    validateImage
-} = require('../middleware/imageValidation')
-
-const {
-    validatePost
-} = require('../middleware/postValidation')
-
-const {
-    validateBio
-} = require("../middleware/biovalidation")
+const {validateToken} = require('../middleware/tokenValidation')
+const {validateUsername} = require('../middleware/usernameValidation')
+const {validatePassword} = require('../middleware/passwordValidation')
+const {validateUpdatePassword} = require('../middleware/passwordUpdateValidation')
+const {validateEmail} = require('../middleware/emailValidation')
+const {validateImage} = require('../middleware/imageValidation')
+const {validatePost} = require('../middleware/postValidation')
+const {validateBio} = require("../middleware/biovalidation")
 
 router.post('/register', validateUsername, validatePassword, validateEmail, register)
 router.post('/login', validateUsername, validatePassword, login)
@@ -66,6 +45,9 @@ router.post('/updatePost', validateToken, updatePost)
 router.get('/posts', validateToken, getAllPosts)
 router.get('/post/:postId', validateToken, getSinglePost)
 router.post('/getUser', validateToken, getOtherUser)
+
+router.post('/addComment', validateToken, addComment)
+router.post('/postComments', validateToken, getPostComments)
 
 
 module.exports = router

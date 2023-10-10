@@ -1,27 +1,33 @@
 const postDb = require('../schemas/postSchema')
+const commentDb = require('../schemas/commentSchema')
+
+const getDate = () => {
+    const fullDate = new Date()
+    const day = String(fullDate.getDate()).padStart(2, '0')
+    const month = String(fullDate.getMonth() + 1).padStart(2, '0')
+    const year = fullDate.getFullYear()
+    const hours = fullDate.getHours()
+    const minutes = fullDate.getMinutes()
+    const seconds = fullDate.getSeconds()
+
+    const date = `${year}-${month}-${day}`
+    const time = `${hours}:${minutes}:${seconds}`
+
+    return `${date} ${time}`
+}
 
 module.exports = {
     addPost: async (req, res) => {
         const {image, title} = req.body
         const user = req.user
 
-        const fullDate = new Date()
-        const day = String(fullDate.getDate()).padStart(2, '0')
-        const month = String(fullDate.getMonth() + 1).padStart(2, '0')
-        const year = fullDate.getFullYear()
-        const hours = fullDate.getHours()
-        const minutes = fullDate.getMinutes()
-        const seconds = fullDate.getSeconds()
-
-        const date = `${year}-${month}-${day}`
-        const time = `${hours}:${minutes}:${seconds}`
 
         const newPost = new postDb({
             username: user.username,
             userId: user.id,
             image,
             title,
-            date: `${date} ${time}`
+            date: getDate()
         })
 
         try {
@@ -81,6 +87,52 @@ module.exports = {
 
         } catch (error) {
             res.send({error: true, message: 'Post not found', data: null})
+            console.log('error', error)
+        }
+
+    },
+
+    addComment: async (req, res) => {
+        const { text, postId } = req.body
+        const user = req.user
+
+        const newComment = new commentDb({
+            username: user.username,
+            postId: postId,
+            date: getDate(),
+            comment: text,
+        })
+
+        console.log('newComment', newComment)
+
+        try {
+            newComment.save()
+            const comments = await commentDb.find({postId})
+            // const sortedByTime = comments.sort((objA, objB) => {
+            //     return new Date(objB.date) - new Date(objA.date)
+            // })
+
+            res.send({error: false, message: 'Comment added', data: comments})
+
+        } catch (error) {
+            res.send({error: true, message: 'Error', data: null,})
+        }
+    },
+
+    getPostComments: async (req, res) => {
+
+        const { postId }  = req.params
+
+        try {
+            const comments = await commentDb.find({postId})
+            const sortedByTime = comments.sort((objA, objB) => {
+                return new Date(objB.date) - new Date(objA.date)
+            })
+            console.log('comments find', sortedByTime)
+            res.send({error: false, message: 'Comments retrieved', data: sortedByTime});
+
+        } catch (error) {
+            res.send({error: true, message: 'Comments not found', data: null})
             console.log('error', error)
         }
 

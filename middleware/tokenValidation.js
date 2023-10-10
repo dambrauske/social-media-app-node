@@ -15,6 +15,17 @@ module.exports = {
 
             next()
         })
+    },
+    validateTokenInSockets: (token) => {
+        return new Promise((resolve, reject) => {
+            jwt.verify(token, process.env.JWT_SECRET, (error, data) => {
+                if (error) {
+                    reject('Token error')
+                } else {
+                    resolve(data)
+                }
+            })
+        })
     }
 }
 

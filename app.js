@@ -20,6 +20,8 @@ app.get('/', (req, res) => {
 
 const server = createServer(app)
 
+require('./modules/sockets')(server)
+
 app.use(cors())
 app.use(express.json())
 app.use('/', router)
@@ -28,11 +30,12 @@ app.use('/', router)
 const portApp = 8000
 const portSocket = 8001
 
+app.listen(portApp, () => {
+    console.log('Express app running at http://localhost:' + portApp)
+})
+
 server.listen(portSocket, () => {
     console.log('Socket.IO server running at http://localhost:' + portSocket)
 })
 
-app.listen(portApp, () => {
-    console.log('Express app running at http://localhost:' + portApp)
-})
 

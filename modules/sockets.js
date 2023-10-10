@@ -1,5 +1,9 @@
 const {Server} = require('socket.io')
 const jwt = require('jsonwebtoken')
+const userDb = require('../schemas/userSchema')
+const postDb = require('../schemas/postSchema')
+const commentDb = require('../schemas/commentSchema')
+const {validateTokenInSockets} = require('../middleware/tokenValidation')
 
 
 module.exports = (server) => {
@@ -13,22 +17,27 @@ module.exports = (server) => {
     io.on('connection', (socket) => {
 
         console.log(`user connected: ${socket.id}`)
+        socket.emit("hello", "world")
 
-        socket.on('getAllPosts', async (data) => {
-            const token = data.token
-            let userId
-
-            try {
-                const decoded = await jwt.verify(token, process.env.JWT_SECRET)
-                userId = decoded.id
-
-                const posts = await postsDb.find()
-                socket.emit('allPosts', posts)
-            } catch (error) {
-                console.error('Error while getting posts', error)
-            }
+        socket.on('disconnect', () => {
+            console.log('user disconnected');
         })
 
+        socket.on('fetchPostComments', async (data) => {
+            const {token, postId} = data
+
+            try {
+                const userData = await validateTokenInSockets(token)
+                if (userData) {
+                    const comments = await commentDb.find({postId})
+                    socket.emit('postComments', comments)
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                socket.emit('tokenValidationFailed', error);
+            }
+
+        })
     })
 
 }
