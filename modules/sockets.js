@@ -190,6 +190,7 @@ module.exports = (server) => {
 
         })
 
+
         socket.on('getUser', async (data) => {
             console.log('getUser request')
             const {userId, token} = data
@@ -236,16 +237,18 @@ module.exports = (server) => {
 
                         if (userInDb && postInDb) {
 
-                            const alreadyLiked = await likeDb.findOne({user: userData.id})
+                            const alreadyLiked = await likeDb.findOne({user: userData.id, post: postId})
 
                             if (alreadyLiked) {
                                 await likeDb.findByIdAndRemove(alreadyLiked._id);
+
                                 await postDb.findByIdAndUpdate(
                                     {_id: postId},
                                     {$pull: {likes: alreadyLiked._id}}
                                 )
 
-                                const posts = await postDb.find().populate('user', '-password');
+                                const likes = await likeDb.findOne({_id: alreadyLiked._id}).populate('user', '-password').populate('post')
+                                const posts = await postDb.find().populate('user', '-password').populate('likes')
                                 socket.emit('updatedPosts', posts)
 
                             } else {
@@ -278,7 +281,6 @@ module.exports = (server) => {
             }
 
         })
-
     })
 
 }
