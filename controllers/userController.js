@@ -1,6 +1,7 @@
 const userDb = require('../schemas/userSchema')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+const {Types} = require("mongoose");
 
 
 module.exports = {
@@ -20,6 +21,7 @@ module.exports = {
         const hash = await bcrypt.hash(password, 13)
 
         const newUser = new userDb({
+            _id: new Types.ObjectId(),
             username,
             email,
             password: hash,

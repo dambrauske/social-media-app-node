@@ -18,14 +18,21 @@ const userSchema = new Schema({
     password: {
         type: String,
         required: true,
+        select: false,
     },
     bio: {
         type: String,
         required: false,
     },
+    posts: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Post',
+    }]
 
 })
 
-const user = mongoose.model('Social-app-users', userSchema)
 
-module.exports = user
+
+const User = mongoose.model('User', userSchema)
+
+module.exports = User

@@ -3,13 +3,9 @@ const Schema = mongoose.Schema
 
 
 const postSchema = new Schema({
-    username: {
-        type: String,
-        required: true,
-    },
-    userId: {
-        type: String,
-        required: true,
+    user: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
     },
     date: {
       type: String,
@@ -23,17 +19,17 @@ const postSchema = new Schema({
         type: String,
         required: true,
     },
-    comments: {
-        type: [String],
-        required: true,
-    },
-    likes: {
-        type: [String],
-        required: false,
-    },
+    comments: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Comment',
+    }],
+    likes: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Like',
+    }]
 
 })
 
-const post = mongoose.model('Social-app-posts', postSchema)
+const Post = mongoose.model('Post', postSchema)
 
-module.exports = post
+module.exports = Post

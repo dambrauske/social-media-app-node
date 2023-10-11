@@ -39,15 +39,11 @@ router.post('/updateBio', validateToken, validateBio, updateUserBio)
 router.post('/user', validateToken, getCurrentUser)
 router.get('/users', validateToken, getAllUsers)
 
-router.post('/addPost', validateToken, validatePost, addPost)
 router.post('/deletePost', validateToken, deletePost)
 router.post('/updatePost', validateToken, updatePost)
 router.get('/posts', validateToken, getAllPosts)
-router.get('/post/:postId', validateToken, getSinglePost)
 router.post('/getUser', validateToken, getOtherUser)
 
-router.post('/addComment', validateToken, addComment)
-router.post('/postComments', validateToken, getPostComments)
 
 
 module.exports = router

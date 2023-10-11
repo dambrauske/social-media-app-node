@@ -3,13 +3,9 @@ const Schema = mongoose.Schema
 
 
 const commentSchema = new Schema({
-    username: {
-        type: String,
-        required: true,
-    },
-    postId: {
-        type: String,
-        required: true,
+    post: {
+        type: Schema.Types.ObjectId,
+        ref: 'Post',
     },
     date: {
         type: String,
@@ -19,9 +15,13 @@ const commentSchema = new Schema({
         type: String,
         required: true,
     },
+    user: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+    },
 
 })
 
-const comment = mongoose.model('Social-app-comments', commentSchema)
+const Comment = mongoose.model('Comment', commentSchema)
 
-module.exports = comment
+module.exports = Comment
