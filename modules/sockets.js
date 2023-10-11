@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken')
 const userDb = require('../schemas/userSchema')
 const postDb = require('../schemas/postSchema')
 const commentDb = require('../schemas/commentSchema')
-const LikeDb = require('../schemas/LikeSchema')
+const likeDb = require('../schemas/LikeSchema')
 const {validateTokenInSockets} = require('../middleware/tokenValidation')
 
 
@@ -49,7 +49,7 @@ module.exports = (server) => {
 
                     try {
                         const post = await postDb.findOne({_id: postId}).populate('comments')
-                        const postComments = await commentDb.find({post: postId}).populate('user')
+                        const postComments = await commentDb.find({post: postId}).populate('user', '-password')
                         socket.emit('fetchedSinglePost', {post, postComments})
                     } catch (error) {
                         console.error('Error:', error);
@@ -83,10 +83,10 @@ module.exports = (server) => {
                             comment: text,
                         })
                         await newComment.save()
-                        const comments = await commentDb.find({ post }).populate('user').populate('post')
+                        const comments = await commentDb.find({post}).populate('user', '-password').populate('post')
                         await postDb.findByIdAndUpdate(
-                            { _id: post },
-                            { $push: { comments: newComment._id } }
+                            {_id: post},
+                            {$push: {comments: newComment._id}}
                         )
                         socket.emit('postComments', comments)
 
@@ -120,7 +120,11 @@ module.exports = (server) => {
 
                     try {
                         await newPost.save()
-                        const posts = await postDb.find().populate('user')
+                        const posts = await postDb.find().populate('user', '-password')
+                        await userDb.findByIdAndUpdate(
+                            {_id: userData.id},
+                            {$push: {posts: newPost._id}}
+                        )
                         socket.emit('sendAllPosts', posts)
 
                     } catch (error) {
@@ -145,7 +149,7 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const comments = await commentDb.find({ post: postId }).populate('user').populate('post')
+                        const comments = await commentDb.find({post: postId}).populate('user', '-password').populate('post')
                         console.log('fetchedPostComments', comments)
                         socket.emit('fetchedPostComments', comments)
                     } catch (error) {
@@ -171,8 +175,7 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const posts = await postDb.find().populate('user').populate('comments').populate('likes')
-                        console.log('posts', posts)
+                        const posts = await postDb.find().populate('user', '-password').populate('comments').populate('likes')
                         socket.emit('fetchedPosts', posts)
                     } catch (error) {
                         console.error('Error:', error);
@@ -187,7 +190,6 @@ module.exports = (server) => {
 
         })
 
-
         socket.on('getUser', async (data) => {
             console.log('getUser request')
             const {userId, token} = data
@@ -201,7 +203,6 @@ module.exports = (server) => {
 
                     try {
                         const userInDb = await userDb.findOne({username})
-                        console.log('userInDb', userInDb)
                         const userImage = userInDb.image
                         socket.emit('singleUserImage', userImage)
                     } catch (error) {
@@ -216,6 +217,68 @@ module.exports = (server) => {
             }
 
         })
+
+        socket.on('likePost', async (data) => {
+            console.log('likePost request')
+            const {token, postId} = data
+            console.log('data', data)
+
+            try {
+                const userData = await validateTokenInSockets(token)
+                console.log('userData', userData)
+                console.log('userid', userData.id)
+
+                if (userData) {
+
+                    try {
+                        const userInDb = await userDb.findOne({_id: userData.id})
+                        const postInDb = await postDb.findOne({_id: postId})
+
+                        if (userInDb && postInDb) {
+
+                            const alreadyLiked = await likeDb.findOne({user: userData.id})
+
+                            if (alreadyLiked) {
+                                await likeDb.findByIdAndRemove(alreadyLiked._id);
+                                await postDb.findByIdAndUpdate(
+                                    {_id: postId},
+                                    {$pull: {likes: alreadyLiked._id}}
+                                )
+
+                                const posts = await postDb.find().populate('user', '-password');
+                                socket.emit('updatedPosts', posts)
+
+                            } else {
+                                const newLike = new likeDb({
+                                    user: userInDb._id,
+                                    post: postId,
+                                })
+                                await newLike.save()
+
+                                await postDb.findByIdAndUpdate(
+                                    {_id: postId},
+                                    {$push: {likes: newLike._id}}
+                                )
+
+                                const likes = await likeDb.findOne({_id: newLike._id}).populate('user', '-password').populate('post')
+                                const posts = await postDb.find().populate('user', '-password').populate('likes')
+                                socket.emit('updatedPosts', posts)
+                            }
+
+                        }
+
+                    } catch (error) {
+                        console.error('Error:', error);
+                        socket.emit('comment adding failed', error);
+                    }
+                }
+            } catch (error) {
+                console.error('error:', error);
+                socket.emit('token validation failed', error);
+            }
+
+        })
+
     })
 
 }

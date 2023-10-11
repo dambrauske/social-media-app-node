@@ -60,10 +60,15 @@ module.exports = {
     },
     login: async (req, res) => {
 
+        console.log('login')
+
         const {username, password} = req.body
+
+        console.log('username, password', username, password)
 
         try {
             const user = await userDb.findOne({username: username})
+            console.log('user', user)
 
             if (!user) {
                 res.send({
@@ -72,6 +77,9 @@ module.exports = {
                     data: null
                 });
             }
+
+            console.log('userpass', user.password)
+
 
             const isValid = await bcrypt.compare(password, user.password)
 
@@ -102,6 +110,7 @@ module.exports = {
 
         } catch (error) {
             res.send({error: true, message: 'An error occurred', data: null})
+            console.log(error)
         }
     },
     updateUserImage: async (req, res) => {
@@ -233,12 +242,13 @@ module.exports = {
     },
     getAllUsers: async (req, res) => {
         try {
-            const allUsers = await userDb.find()
+            const allUsers = await userDb.find().populate('posts')
 
             const users = allUsers.map(user => ({
                 username: user.username,
                 image: user.image,
                 bio: user.bio || null,
+                posts: user.posts,
             }))
 
             res.send({error: false, message: 'Users retrieved', data: users})
