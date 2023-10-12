@@ -33,13 +33,11 @@ module.exports = {
             res.send({error: true, message: 'An error occurred', data: null})
         }
     },
-
-
     getAllPosts: async (req, res) => {
         const user = req.user
 
         try {
-            const posts = await postDb.find()
+            const posts = await postDb.find().populate('user').populate('comments').populate('likes')
             const sortedByTime = posts.sort((objA, objB) => {
                 return new Date(objB.date) - new Date(objA.date)
             })

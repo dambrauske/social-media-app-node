@@ -41,10 +41,13 @@ module.exports = {
                 error: false,
                 message: 'User saved',
                 data: {
-                    _id: newUser._id,
-                    username: newUser.username,
-                    image: newUser.image,
                     token,
+                    user: {
+                        id: newUser._id,
+                        username: newUser.username,
+                        image: newUser.image,
+                    }
+
                 },
             })
 
@@ -78,9 +81,6 @@ module.exports = {
                 });
             }
 
-            console.log('userpass', user.password)
-
-
             const isValid = await bcrypt.compare(password, user.password)
 
             if (!isValid) {
@@ -103,8 +103,11 @@ module.exports = {
                 message: 'User found',
                 data: {
                     token,
-                    username: user.username,
-                    image: user.image,
+                    user: {
+                        id: user._id,
+                        username: user.username,
+                        image: user.image,
+                    }
                 },
             })
 
@@ -207,8 +210,13 @@ module.exports = {
                 error: false,
                 message: 'User found',
                 data: {
-                    username: userInDb.username,
-                    image: userInDb.image,
+                    user: {
+                        id: userInDb._id,
+                        username: userInDb.username,
+                        image: userInDb.image,
+                        bio: userInDb.bio,
+                    }
+
                 }
             })
 

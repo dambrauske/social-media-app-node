@@ -48,7 +48,8 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const post = await postDb.findOne({_id: postId}).populate('comments')
+                        const post = await postDb.findOne({_id: postId}).populate('comments').populate('likes')
+                        console.log('post', post)
                         const postComments = await commentDb.find({post: postId}).populate('user', '-password')
                         socket.emit('fetchedSinglePost', {post, postComments})
                     } catch (error) {
@@ -165,8 +166,8 @@ module.exports = (server) => {
 
         })
 
-        socket.on('fetchPosts', async (data) => {
-            console.log('fetchPosts request')
+        socket.on('getPosts', async (data) => {
+            console.log('getPosts request')
             const {token} = data
 
             try {
@@ -176,10 +177,10 @@ module.exports = (server) => {
 
                     try {
                         const posts = await postDb.find().populate('user', '-password').populate('comments').populate('likes')
-                        socket.emit('fetchedPosts', posts)
+                        socket.emit('Posts', posts)
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('fetchPosts failed', error);
+                        socket.emit('getPosts failed', error);
                     }
 
                 }
@@ -189,7 +190,6 @@ module.exports = (server) => {
             }
 
         })
-
 
         socket.on('getUser', async (data) => {
             console.log('getUser request')
@@ -248,8 +248,9 @@ module.exports = (server) => {
                                 )
 
                                 const likes = await likeDb.findOne({_id: alreadyLiked._id}).populate('user', '-password').populate('post')
-                                const posts = await postDb.find().populate('user', '-password').populate('likes')
-                                socket.emit('updatedPosts', posts)
+                                const posts = await postDb.find().populate('user', '-password').populate('likes').populate('comments')
+                                const updatedPostUnliked = await postDb.findOne({_id: postId}).populate('user', '-password').populate('likes').populate('comments')
+                                socket.emit('updatedPost', updatedPostUnliked)
 
                             } else {
                                 const newLike = new likeDb({
@@ -264,8 +265,9 @@ module.exports = (server) => {
                                 )
 
                                 const likes = await likeDb.findOne({_id: newLike._id}).populate('user', '-password').populate('post')
-                                const posts = await postDb.find().populate('user', '-password').populate('likes')
-                                socket.emit('updatedPosts', posts)
+                                const posts = await postDb.find().populate('user', '-password').populate('likes').populate('comments')
+                                const updatedPostLiked = await postDb.findOne({_id: postId}).populate('user', '-password').populate('likes').populate('comments')
+                                socket.emit('updatedPost', updatedPostLiked)
                             }
 
                         }
