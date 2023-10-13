@@ -12,23 +12,12 @@ const {
     getOtherUser,
 } = require('../controllers/userController')
 
-const {
-    addPost,
-    deletePost,
-    getAllPosts,
-    updatePost,
-    getSinglePost,
-    addComment,
-    getPostComments,
-} = require('../controllers/postController')
-
 const {validateToken} = require('../middleware/tokenValidation')
 const {validateUsername} = require('../middleware/usernameValidation')
 const {validatePassword} = require('../middleware/passwordValidation')
 const {validateUpdatePassword} = require('../middleware/passwordUpdateValidation')
 const {validateEmail} = require('../middleware/emailValidation')
 const {validateImage} = require('../middleware/imageValidation')
-const {validatePost} = require('../middleware/postValidation')
 const {validateBio} = require("../middleware/biovalidation")
 
 router.post('/register', validateUsername, validatePassword, validateEmail, register)
@@ -38,10 +27,6 @@ router.post('/updatePassword', validateToken, validateUpdatePassword, updateUser
 router.post('/updateBio', validateToken, validateBio, updateUserBio)
 router.post('/user', validateToken, getCurrentUser)
 router.get('/users', validateToken, getAllUsers)
-
-router.post('/deletePost', validateToken, deletePost)
-router.post('/updatePost', validateToken, updatePost)
-router.get('/posts', validateToken, getAllPosts)
 router.post('/getUser', validateToken, getOtherUser)
 
 

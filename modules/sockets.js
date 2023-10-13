@@ -12,15 +12,16 @@ const getDate = () => {
     const day = String(fullDate.getDate()).padStart(2, '0')
     const month = String(fullDate.getMonth() + 1).padStart(2, '0')
     const year = fullDate.getFullYear()
-    const hours = fullDate.getHours()
-    const minutes = fullDate.getMinutes()
-    const seconds = fullDate.getSeconds()
+    const hours = String(fullDate.getHours()).padStart(2, '0')
+    const minutes = String(fullDate.getMinutes()).padStart(2, '0')
+    const seconds = String(fullDate.getSeconds()).padStart(2, '0')
 
     const date = `${year}-${month}-${day}`
     const time = `${hours}:${minutes}:${seconds}`
 
     return `${date} ${time}`
 }
+
 
 module.exports = (server) => {
 
@@ -49,8 +50,8 @@ module.exports = (server) => {
 
                     try {
                         const post = await postDb.findOne({_id: postId}).populate('comments').populate('likes')
-                        console.log('post', post)
-                        const postComments = await commentDb.find({post: postId}).populate('user', '-password')
+                        const postComments = await commentDb.find({post: postId}).populate('user', '-password').populate('post')
+                        console.log('postComments')
                         socket.emit('fetchedSinglePost', {post, postComments})
                     } catch (error) {
                         console.error('Error:', error);
@@ -66,27 +67,26 @@ module.exports = (server) => {
 
         socket.on('addComment', async (data) => {
             console.log('addComment request')
-            const {text, post, token} = data
+            const {text, postId, token} = data
             console.log('data', data)
 
             try {
                 const userData = await validateTokenInSockets(token)
-                console.log('userData', userData)
-                console.log('userid', userData.id)
+
                 if (userData) {
 
                     try {
                         const userInDb = await userDb.findOne({_id: userData.id})
                         const newComment = new commentDb({
                             user: userInDb._id,
-                            post: post,
+                            post: postId,
                             date: getDate(),
                             comment: text,
                         })
                         await newComment.save()
-                        const comments = await commentDb.find({post}).populate('user', '-password').populate('post')
+                        const comments = await commentDb.find({post: postId}).populate('user', '-password').populate('post')
                         await postDb.findByIdAndUpdate(
-                            {_id: post},
+                            {_id: postId},
                             {$push: {comments: newComment._id}}
                         )
                         socket.emit('postComments', comments)
@@ -130,12 +130,12 @@ module.exports = (server) => {
 
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('post adding failed', error);
+                        socket.emit('post adding failed');
                     }
                 }
             } catch (error) {
                 console.error('error:', error);
-                socket.emit('token validation failed', error);
+                socket.emit('token validation failed');
             }
 
         })
@@ -155,13 +155,13 @@ module.exports = (server) => {
                         socket.emit('fetchedPostComments', comments)
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('fetchedPostComments failed', error);
+                        socket.emit('fetchedPostComments failed');
                     }
 
                 }
             } catch (error) {
                 console.error('Error:', error);
-                socket.emit('tokenValidationFailed', error);
+                socket.emit('tokenValidationFailed');
             }
 
         })
@@ -180,13 +180,13 @@ module.exports = (server) => {
                         socket.emit('Posts', posts)
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('getPosts failed', error);
+                        socket.emit('getPosts failed');
                     }
 
                 }
             } catch (error) {
                 console.error('Error:', error);
-                socket.emit('tokenValidationFailed', error);
+                socket.emit('tokenValidationFailed');
             }
 
         })
@@ -194,8 +194,6 @@ module.exports = (server) => {
         socket.on('getUser', async (data) => {
             console.log('getUser request')
             const {userId, token} = data
-
-            console.log('data', data)
 
             try {
                 const userData = await validateTokenInSockets(token)
@@ -208,13 +206,13 @@ module.exports = (server) => {
                         socket.emit('singleUserImage', userImage)
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('getSingleUserImage failed', error);
+                        socket.emit('getSingleUserImage failed');
                     }
 
                 }
             } catch (error) {
                 console.error('Error:', error);
-                socket.emit('tokenValidationFailed', error);
+                socket.emit('tokenValidationFailed');
             }
 
         })
@@ -222,12 +220,9 @@ module.exports = (server) => {
         socket.on('likePost', async (data) => {
             console.log('likePost request')
             const {token, postId} = data
-            console.log('data', data)
 
             try {
                 const userData = await validateTokenInSockets(token)
-                console.log('userData', userData)
-                console.log('userid', userData.id)
 
                 if (userData) {
 
@@ -274,12 +269,49 @@ module.exports = (server) => {
 
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('comment adding failed', error);
+                        socket.emit('comment adding failed');
                     }
                 }
             } catch (error) {
                 console.error('error:', error);
-                socket.emit('token validation failed', error);
+                socket.emit('token validation failed');
+            }
+
+        })
+
+        socket.on('deletePost', async (data) => {
+            console.log('deletePost request')
+            const {token, postId} = data
+
+            try {
+                const userData = await validateTokenInSockets(token)
+
+                if (userData) {
+
+                    const post = await postDb.findOne({_id: postId})
+                    console.log('post to delete', post)
+
+                    if (!post) {
+                        socket.emit('post not found');
+                    }
+
+                    if (post.username !== userData.username) {
+                        socket.emit('Post cannot be deleted');
+                    }
+
+                    try {
+                        await postDb.findOneAndDelete({_id: postId})
+                        const posts = await postDb.find().populate('user', '-password').populate('likes').populate('comments')
+                        socket.emit('PostsUpdated', posts);
+
+                    } catch (error) {
+                        console.log(error)
+                        socket.emit('error');
+                    }
+                }
+            } catch (error) {
+                console.error('error:', error);
+                socket.emit('token validation failed');
             }
 
         })
