@@ -23,8 +23,8 @@ module.exports = {
             return res.send({error: true, message: 'Title cannot be blank', data: null})
         }
 
-        if (title && title.length > 100) {
-            return res.send({error: true, message: 'Title cannot be longer than 100 characters', data: null})
+        if (title && title.length > 50) {
+            return res.send({error: true, message: 'Title cannot be longer than 50 characters', data: null})
         }
 
         next()

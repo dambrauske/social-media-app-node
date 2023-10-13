@@ -39,8 +39,8 @@ module.exports = (server) => {
             console.log('user disconnected');
         })
 
-        socket.on('fetchSinglePost', async (data) => {
-            console.log('fetchSinglePost request')
+        socket.on('getSinglePost', async (data) => {
+            console.log('getSinglePost request')
             const {token, postId} = data
 
             try {
@@ -49,10 +49,18 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const post = await postDb.findOne({_id: postId}).populate('comments').populate('likes')
-                        const postComments = await commentDb.find({post: postId}).populate('user', '-password').populate('post')
-                        console.log('postComments')
-                        socket.emit('fetchedSinglePost', {post, postComments})
+                        const post = await postDb.findOne({_id: postId})
+                            .populate({
+                                path: 'comments',
+                                populate: {
+                                    path: 'user',
+                                    select: '-password'
+                                }
+                            })
+                            .populate('likes')
+                            .populate('user', '-password')
+                        console.log('singlePost', post)
+                        socket.emit('singlePost', post)
                     } catch (error) {
                         console.error('Error:', error);
                         socket.emit('fetchedSinglePost failed', error);
@@ -89,7 +97,17 @@ module.exports = (server) => {
                             {_id: postId},
                             {$push: {comments: newComment._id}}
                         )
-                        socket.emit('postComments', comments)
+                        const post = await postDb.findOne({_id: postId})
+                            .populate({
+                                path: 'comments',
+                                populate: {
+                                    path: 'user',
+                                    select: '-password'
+                                }
+                            })
+                            .populate('likes')
+                            .populate('user', '-password')
+                        socket.emit('post', post)
 
                     } catch (error) {
                         console.error('Error:', error);
@@ -176,7 +194,16 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const posts = await postDb.find().populate('user', '-password').populate('comments').populate('likes')
+                        const posts = await postDb.find()
+                            .populate('likes')
+                            .populate('user')
+                            .populate({
+                            path: 'comments',
+                            populate: {
+                                path: 'user',
+                                select: '-password'
+                            }
+                        })
                         socket.emit('Posts', posts)
                     } catch (error) {
                         console.error('Error:', error);
@@ -191,8 +218,8 @@ module.exports = (server) => {
 
         })
 
-        socket.on('getUser', async (data) => {
-            console.log('getUser request')
+        socket.on('getUserAndPosts', async (data) => {
+            console.log('getUserAndHisPosts request')
             const {userId, token} = data
 
             try {
@@ -201,12 +228,14 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const userInDb = await userDb.findOne({username})
-                        const userImage = userInDb.image
-                        socket.emit('singleUserImage', userImage)
+                        const user = await userDb.findOne({_id: userId}).populate('posts')
+                        const posts = await postDb.find({user: userId}).populate('user', '-password').populate('comments').populate('likes')
+                        console.log('user', user)
+                        console.log('posts', posts)
+                        socket.emit('UserAndPosts', {user, posts})
                     } catch (error) {
                         console.error('Error:', error);
-                        socket.emit('getSingleUserImage failed');
+                        socket.emit('getUserAndHisPosts failed');
                     }
 
                 }

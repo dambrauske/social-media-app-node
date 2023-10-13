@@ -253,6 +253,7 @@ module.exports = {
             const allUsers = await userDb.find().populate('posts')
 
             const users = allUsers.map(user => ({
+                id: user._id,
                 username: user.username,
                 image: user.image,
                 bio: user.bio || null,
