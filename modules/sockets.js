@@ -204,7 +204,10 @@ module.exports = (server) => {
                                 select: '-password'
                             }
                         })
-                        socket.emit('Posts', posts)
+                        const sortedPosts = [...posts].sort((objA, objB) => {
+                            return new Date(objB.date).getTime() - new Date(objA.date).getTime();
+                        })
+                        socket.emit('Posts', sortedPosts)
                     } catch (error) {
                         console.error('Error:', error);
                         socket.emit('getPosts failed');
