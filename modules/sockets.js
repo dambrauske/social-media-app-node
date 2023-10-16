@@ -509,7 +509,7 @@ module.exports = (server) => {
         })
 
         socket.on('getSelectedChat', async (data) => {
-            console.log('getChats request')
+            console.log('getSelectedChat request')
             const {token, selectedUserId} = data
 
             try {
@@ -518,7 +518,11 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const chat = await chatDb.find({'participants': userData.id, selectedUserId})
+                        const chat = await chatDb.findOne({
+                            participants: {
+                                $all: [userData.id, selectedUserId]
+                            }
+                        })
                             .populate({
                                 path: 'participants',
                                 select: '-password -email -posts -bio'
@@ -530,7 +534,7 @@ module.exports = (server) => {
                                 }
                             })
 
-                        console.log('chats', chat)
+                        console.log('chat', chat)
 
                         socket.emit('selectedChat', chat)
                     } catch (error) {
