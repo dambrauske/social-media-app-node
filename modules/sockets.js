@@ -1,6 +1,8 @@
 const {Server} = require('socket.io')
 const jwt = require('jsonwebtoken')
 const userDb = require('../schemas/userSchema')
+const messageDb = require('../schemas/messageSchema')
+const chatDb = require('../schemas/chatSchema')
 const postDb = require('../schemas/postSchema')
 const commentDb = require('../schemas/commentSchema')
 const likeDb = require('../schemas/LikeSchema')
@@ -144,7 +146,10 @@ module.exports = (server) => {
                             {_id: userData.id},
                             {$push: {posts: newPost._id}}
                         )
-                        socket.emit('sendAllPosts', posts)
+                        const sortedPosts = [...posts].sort((objA, objB) => {
+                            return new Date(objB.date).getTime() - new Date(objA.date).getTime();
+                        })
+                        socket.emit('sendAllPosts', sortedPosts)
 
                     } catch (error) {
                         console.error('Error:', error);
@@ -198,12 +203,12 @@ module.exports = (server) => {
                             .populate('likes')
                             .populate('user')
                             .populate({
-                            path: 'comments',
-                            populate: {
-                                path: 'user',
-                                select: '-password'
-                            }
-                        })
+                                path: 'comments',
+                                populate: {
+                                    path: 'user',
+                                    select: '-password'
+                                }
+                            })
                         const sortedPosts = [...posts].sort((objA, objB) => {
                             return new Date(objB.date).getTime() - new Date(objA.date).getTime();
                         })
@@ -347,6 +352,201 @@ module.exports = (server) => {
             }
 
         })
+
+        //MESSAGES
+
+        socket.on('addMessage', async (data) => {
+            console.log('addMessage request')
+            const {token, messageReceiverId, message} = data
+
+            try {
+                const userData = await validateTokenInSockets(token)
+
+                if (userData) {
+
+                    try {
+                        const userInDb = await userDb.findOne({_id: userData.id})
+                        const receivedInDb = await userDb.findOne({_id: messageReceiverId})
+
+                        const existingChat = await chatDb.findOne({
+                            participants: {
+                                $all: [userInDb._id, receivedInDb._id]
+                            }
+                        })
+
+                        if (existingChat) {
+                            const newMessage = new messageDb({
+                                chat: existingChat._id,
+                                sentBy: userInDb._id,
+                                message,
+                            })
+
+                            const savedMessage = await newMessage.save()
+
+                            await chatDb.findByIdAndUpdate(
+                                {_id: existingChat._id},
+                                {$push: {messages: newMessage._id}}
+                            )
+
+                            const chat = await chatDb.findOne({
+                                participants: {
+                                    $all: [userInDb._id, receivedInDb._id]
+                                }
+                            }).populate({
+                                path: 'participants',
+                                select: '-password -email -posts -bio'
+                            }).populate({
+                                path: 'messages',
+                                populate: {
+                                    path: 'sentBy',
+                                    select: '-password -email -posts -bio'
+                                }
+                            })
+
+                            socket.emit('chat', chat)
+
+
+                        } else {
+                            const newChat = new chatDb({
+                                participants: [userInDb._id, receivedInDb._id],
+                            })
+
+                            await newChat.save()
+
+                            const newMessage = new messageDb({
+                                chat: newChat._id,
+                                sentBy: userInDb._id,
+                                message,
+                            })
+
+                            await newMessage.save()
+
+
+                            await chatDb.findByIdAndUpdate(
+                                {_id: newChat._id},
+                                {$push: {messages: newMessage._id}}
+                            )
+
+                            const chat = await chatDb.findOne({_id: newChat._id})
+                                .populate({
+                                    path: 'participants',
+                                    select: '-password -email -posts -bio'
+                                }).populate({
+                                    path: 'messages',
+                                    populate: {
+                                        path: 'sentBy',
+                                        select: '-password -email -posts -bio'
+                                    }
+                                })
+
+                            socket.emit('chat', chat)
+                        }
+
+                        // const post = await postDb.findOne({_id: postId})
+                        //     .populate({
+                        //         path: 'comments',
+                        //         populate: {
+                        //             path: 'user',
+                        //             select: '-password'
+                        //         }
+                        //     })
+                        //     .populate('likes')
+                        //     .populate('user', '-password')
+
+
+                    } catch
+                        (error) {
+                        console.error('Error:', error);
+                        socket.emit('message adding failed', error);
+                    }
+                }
+            } catch
+                (error) {
+                console.error('error:', error);
+                socket.emit('token validation failed', error);
+            }
+
+        })
+
+        socket.on('getChats', async (data) => {
+            console.log('getChats request')
+            const {token} = data
+
+            try {
+                const userData = await validateTokenInSockets(token)
+
+                if (userData) {
+
+                    try {
+                        const chats = await chatDb.find({'participants': userData.id})
+                            .populate({
+                                path: 'participants',
+                                select: '-password -email -posts -bio'
+                            }).populate({
+                                path: 'messages',
+                                populate: {
+                                    path: 'sentBy',
+                                    select: '-password -email -posts -bio'
+                                }
+                            })
+
+                        console.log('chats', chats)
+                        const sortedChats = [...chats].sort((objA, objB) => {
+                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
+                        })
+                        socket.emit('chats', sortedChats)
+                    } catch (error) {
+                        console.error('Error:', error);
+                        socket.emit('getChats failed');
+                    }
+
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                socket.emit('tokenValidationFailed');
+            }
+
+        })
+
+        socket.on('getSelectedChat', async (data) => {
+            console.log('getChats request')
+            const {token, selectedUserId} = data
+
+            try {
+                const userData = await validateTokenInSockets(token)
+
+                if (userData) {
+
+                    try {
+                        const chat = await chatDb.find({'participants': userData.id, selectedUserId})
+                            .populate({
+                                path: 'participants',
+                                select: '-password -email -posts -bio'
+                            }).populate({
+                                path: 'messages',
+                                populate: {
+                                    path: 'sentBy',
+                                    select: '-password -email -posts -bio'
+                                }
+                            })
+
+                        console.log('chats', chat)
+
+                        socket.emit('selectedChat', chat)
+                    } catch (error) {
+                        console.error('Error:', error);
+                        socket.emit('selectedChat failed');
+                    }
+
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                socket.emit('tokenValidationFailed');
+            }
+
+        })
+
     })
+
 
 }
