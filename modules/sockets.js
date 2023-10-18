@@ -357,7 +357,9 @@ module.exports = (server) => {
 
         socket.on('addMessage', async (data) => {
             console.log('addMessage request')
-            const {token, messageReceiverId, message} = data
+            const {token, otherUserId, message} = data
+
+            console.log('data', data)
 
             try {
                 const userData = await validateTokenInSockets(token)
@@ -366,11 +368,15 @@ module.exports = (server) => {
 
                     try {
                         const userInDb = await userDb.findOne({_id: userData.id})
-                        const receivedInDb = await userDb.findOne({_id: messageReceiverId})
+                        const receiverInDb = await userDb.findOne({_id: otherUserId})
+                        console.log(
+                            'userInDb', userInDb,
+                            'receiverInDb', receiverInDb
+                        )
 
                         const existingChat = await chatDb.findOne({
                             participants: {
-                                $all: [userInDb._id, receivedInDb._id]
+                                $all: [userInDb._id, receiverInDb._id]
                             }
                         })
 
@@ -381,7 +387,7 @@ module.exports = (server) => {
                                 message,
                             })
 
-                            const savedMessage = await newMessage.save()
+                            await newMessage.save()
 
                             await chatDb.findByIdAndUpdate(
                                 {_id: existingChat._id},
@@ -390,25 +396,41 @@ module.exports = (server) => {
 
                             const chat = await chatDb.findOne({
                                 participants: {
-                                    $all: [userInDb._id, receivedInDb._id]
+                                    $all: [userInDb._id, receiverInDb._id]
                                 }
                             }).populate({
                                 path: 'participants',
-                                select: '-password -email -posts -bio'
+                                select: '-password -email'
                             }).populate({
                                 path: 'messages',
                                 populate: {
                                     path: 'sentBy',
-                                    select: '-password -email -posts -bio'
+                                    select: '-password -email'
                                 }
                             })
 
-                            socket.emit('chat', chat)
+                            const chatsBeforeSorting = await chatDb.find({'participants': userData.id})
+                                .populate({
+                                path: 'participants',
+                                select: '-password -email'
+                            }).populate({
+                                path: 'messages',
+                                populate: {
+                                    path: 'sentBy',
+                                    select: '-password -email'
+                                }
+                            })
+
+                            const chats = [...chatsBeforeSorting].sort((objA, objB) => {
+                                return new Date(objB.updatedAt).getTime() - new Date(objA.updatedAt).getTime();
+                            })
+
+                            socket.emit('chatsAfterAddingMessage', {chat, chats})
 
 
                         } else {
                             const newChat = new chatDb({
-                                participants: [userInDb._id, receivedInDb._id],
+                                participants: [userInDb._id, receiverInDb._id],
                             })
 
                             await newChat.save()
@@ -439,20 +461,24 @@ module.exports = (server) => {
                                     }
                                 })
 
-                            socket.emit('chat', chat)
+                            const chatsBeforeSorting = await chatDb.find({'participants': userData.id})
+                                .populate({
+                                    path: 'participants',
+                                    select: '-password -email'
+                                }).populate({
+                                    path: 'messages',
+                                    populate: {
+                                        path: 'sentBy',
+                                        select: '-password -email'
+                                    }
+                                })
+
+                            const chats = [...chatsBeforeSorting].sort((objA, objB) => {
+                                return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
+                            })
+
+                            socket.emit('chatsAfterAddingMessage', {chat, chats})
                         }
-
-                        // const post = await postDb.findOne({_id: postId})
-                        //     .populate({
-                        //         path: 'comments',
-                        //         populate: {
-                        //             path: 'user',
-                        //             select: '-password'
-                        //         }
-                        //     })
-                        //     .populate('likes')
-                        //     .populate('user', '-password')
-
 
                     } catch
                         (error) {
@@ -481,16 +507,15 @@ module.exports = (server) => {
                         const chats = await chatDb.find({'participants': userData.id})
                             .populate({
                                 path: 'participants',
-                                select: '-password -email -posts -bio'
+                                select: '-password -email'
                             }).populate({
                                 path: 'messages',
                                 populate: {
                                     path: 'sentBy',
-                                    select: '-password -email -posts -bio'
+                                    select: '-password -email'
                                 }
                             })
 
-                        console.log('chats', chats)
                         const sortedChats = [...chats].sort((objA, objB) => {
                             return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
                         })
@@ -525,23 +550,19 @@ module.exports = (server) => {
                         })
                             .populate({
                                 path: 'participants',
-                                select: '-password -email -posts -bio'
+                                select: '-password -email'
                             }).populate({
                                 path: 'messages',
                                 populate: {
                                     path: 'sentBy',
-                                    select: '-password -email -posts -bio'
+                                    select: '-password -email'
                                 }
                             })
-
-                        console.log('chat', chat)
-
                         socket.emit('selectedChat', chat)
                     } catch (error) {
                         console.error('Error:', error);
                         socket.emit('selectedChat failed');
                     }
-
                 }
             } catch (error) {
                 console.error('Error:', error);
