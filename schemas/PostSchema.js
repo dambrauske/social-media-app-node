@@ -2,14 +2,10 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 
-const postSchema = new Schema({
+const PostSchema = new Schema({
     user: {
         type: Schema.Types.ObjectId,
         ref: 'User',
-    },
-    date: {
-      type: String,
-      required: true,
     },
     image: {
         type: String,
@@ -28,8 +24,12 @@ const postSchema = new Schema({
         ref: 'Like',
     }]
 
+}, {
+    timestamps: {
+        createdAt: true,
+    }
 })
 
-const Post = mongoose.model('Post', postSchema)
+const Post = mongoose.model('Post', PostSchema)
 
 module.exports = Post

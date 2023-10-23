@@ -15,7 +15,7 @@ module.exports = {
                 error: true,
                 message: 'Username is already taken',
                 data: null
-            });
+            })
         }
 
         const hash = await bcrypt.hash(password, 13)
@@ -29,7 +29,7 @@ module.exports = {
         })
 
         const userToken = {
-            id: newUser._id,
+            _id: newUser._id,
             username: newUser.username,
         }
 
@@ -43,7 +43,7 @@ module.exports = {
                 data: {
                     token,
                     user: {
-                        id: newUser._id,
+                        _id: newUser._id,
                         username: newUser.username,
                         image: newUser.image,
                     }
@@ -63,22 +63,17 @@ module.exports = {
     },
     login: async (req, res) => {
 
-        console.log('login')
-
         const {username, password} = req.body
-
-        console.log('username, password', username, password)
 
         try {
             const user = await userDb.findOne({username: username})
-            console.log('user', user)
 
             if (!user) {
                 res.send({
                     error: true,
                     message: 'Wrong credentials',
                     data: null
-                });
+                })
             }
 
             const isValid = await bcrypt.compare(password, user.password)
@@ -88,11 +83,11 @@ module.exports = {
                     error: true,
                     message: 'Wrong credentials',
                     data: null
-                });
+                })
             }
 
             const userToken = {
-                id: user._id,
+                _id: user._id,
                 username: user.username,
             }
 
@@ -104,7 +99,7 @@ module.exports = {
                 data: {
                     token,
                     user: {
-                        id: user._id,
+                        _id: user._id,
                         username: user.username,
                         image: user.image,
                     }
@@ -112,26 +107,30 @@ module.exports = {
             })
 
         } catch (error) {
-            res.send({error: true, message: 'An error occurred', data: null})
-            console.log(error)
+            res.send({
+                error: true,
+                message: 'An error occurred',
+                data: null
+            })
+            console.log('error in login', error)
         }
     },
-    updateUserImage: async (req, res) => {
-        const {newImage} = req.body
+    updateUserPublicProfile: async (req, res) => {
+        const {newImage, newBio} = req.body
         const user = req.user
 
-        const updatedUser = await userDb.findOneAndUpdate(
-            {_id: user.id},
-            {$set: {image: newImage}},
+        await userDb.findOneAndUpdate(
+            {_id: user._id},
+            {$set: {image: newImage, bio: newBio}},
             {new: true}
         )
 
-        const userInDb = await userDb.findOne({_id: user.id})
+        const userInDb = await userDb.findOne({_id: user._id}).select('-password')
 
         res.send({
             error: false,
             message: 'User image updated',
-            data: userInDb.image,
+            data: userInDb
         })
 
     },
@@ -149,7 +148,7 @@ module.exports = {
                     const hash = await bcrypt.hash(newPassword, 13)
 
                     const updatedUser = await userDb.findOneAndUpdate(
-                        { _id: user.id },
+                        { _id: user._id },
                         { $set: { password: hash } },
                         { new: true }
                     )
@@ -184,34 +183,17 @@ module.exports = {
 
 
     },
-    updateUserBio: async (req, res) => {
-        const {updatedBio} = req.body
-        const user = req.user
-
-        const updatedUser = await userDb.findOneAndUpdate(
-            {_id: user.id},
-            {$set: {bio: updatedBio}},
-            {new: true}
-        )
-
-        res.send({
-            error: false,
-            message: 'User bio updated',
-            data: updatedUser.bio,
-        })
-
-    },
     getCurrentUser: async (req, res) => {
         const user = req.user
 
         try {
-            const userInDb = await userDb.findOne({_id: user.id})
+            const userInDb = await userDb.findOne({_id: user._id})
             res.send({
                 error: false,
                 message: 'User found',
                 data: {
                     user: {
-                        id: userInDb._id,
+                        _id: userInDb._id,
                         username: userInDb.username,
                         image: userInDb.image,
                         bio: userInDb.bio,
@@ -250,17 +232,8 @@ module.exports = {
     },
     getAllUsers: async (req, res) => {
         try {
-            const allUsers = await userDb.find().populate('posts')
-
-            const users = allUsers.map(user => ({
-                id: user._id,
-                username: user.username,
-                image: user.image,
-                bio: user.bio || null,
-                posts: user.posts,
-            }))
-
-            res.send({error: false, message: 'Users retrieved', data: users})
+            const allUsers = await userDb.find().populate('posts').select('-password -email')
+            res.send({error: false, message: 'Users retrieved', data: allUsers})
 
         } catch (error) {
             res.send({error: true, message: 'Error retrieving users', data: null});

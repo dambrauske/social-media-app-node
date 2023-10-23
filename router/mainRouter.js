@@ -4,12 +4,11 @@ const router = express.Router()
 const {
     register,
     login,
-    updateUserImage,
     updateUserPassword,
     getCurrentUser,
-    updateUserBio,
     getAllUsers,
     getOtherUser,
+    updateUserPublicProfile,
 } = require('../controllers/userController')
 
 const {validateToken} = require('../middleware/tokenValidation')
@@ -22,9 +21,8 @@ const {validateBio} = require("../middleware/biovalidation")
 
 router.post('/register', validateUsername, validatePassword, validateEmail, register)
 router.post('/login', validateUsername, validatePassword, login)
-router.post('/updateImage', validateToken, validateImage, updateUserImage)
+router.post('/updatePublicProfile', validateToken, validateImage, validateBio, updateUserPublicProfile)
 router.post('/updatePassword', validateToken, validateUpdatePassword, updateUserPassword)
-router.post('/updateBio', validateToken, validateBio, updateUserBio)
 router.post('/user', validateToken, getCurrentUser)
 router.get('/users', validateToken, getAllUsers)
 router.post('/getUser', validateToken, getOtherUser)

@@ -11,8 +11,8 @@ const LikeSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'User',
     },
-
 })
+
 
 const Like = mongoose.model('Like', LikeSchema)
 

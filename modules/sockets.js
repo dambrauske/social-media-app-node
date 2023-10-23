@@ -9,22 +9,6 @@ const likeDb = require('../schemas/LikeSchema')
 const {validateTokenInSockets} = require('../middleware/tokenValidation')
 
 
-const getDate = () => {
-    const fullDate = new Date()
-    const day = String(fullDate.getDate()).padStart(2, '0')
-    const month = String(fullDate.getMonth() + 1).padStart(2, '0')
-    const year = fullDate.getFullYear()
-    const hours = String(fullDate.getHours()).padStart(2, '0')
-    const minutes = String(fullDate.getMinutes()).padStart(2, '0')
-    const seconds = String(fullDate.getSeconds()).padStart(2, '0')
-
-    const date = `${year}-${month}-${day}`
-    const time = `${hours}:${minutes}:${seconds}`
-
-    return `${date} ${time}`
-}
-
-
 module.exports = (server) => {
 
     const io = new Server(server, {
@@ -35,7 +19,7 @@ module.exports = (server) => {
 
     io.on('connection', (socket) => {
 
-        console.log(`user connected: ${socket.id}`)
+        console.log(`user connected: ${socket._id}`)
 
         socket.on('disconnect', () => {
             console.log('user disconnected');
@@ -86,15 +70,16 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const userInDb = await userDb.findOne({_id: userData.id})
+                        const userInDb = await userDb.findOne({_id: userData._id})
                         const newComment = new commentDb({
                             user: userInDb._id,
                             post: postId,
-                            date: getDate(),
                             comment: text,
                         })
                         await newComment.save()
-                        const comments = await commentDb.find({post: postId}).populate('user', '-password').populate('post')
+                        const comments = await commentDb.find({post: postId})
+                            .populate('user', '-password')
+                            .populate('post')
                         await postDb.findByIdAndUpdate(
                             {_id: postId},
                             {$push: {comments: newComment._id}}
@@ -133,8 +118,7 @@ module.exports = (server) => {
                 if (userData) {
 
                     const newPost = new postDb({
-                        user: userData.id,
-                        date: getDate(),
+                        user: userData._id,
                         image,
                         title,
                     })
@@ -143,11 +127,11 @@ module.exports = (server) => {
                         await newPost.save()
                         const posts = await postDb.find().populate('user', '-password')
                         await userDb.findByIdAndUpdate(
-                            {_id: userData.id},
+                            {_id: userData._id},
                             {$push: {posts: newPost._id}}
                         )
                         const sortedPosts = [...posts].sort((objA, objB) => {
-                            return new Date(objB.date).getTime() - new Date(objA.date).getTime();
+                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
                         })
                         socket.emit('sendAllPosts', sortedPosts)
 
@@ -159,32 +143,6 @@ module.exports = (server) => {
             } catch (error) {
                 console.error('error:', error);
                 socket.emit('token validation failed');
-            }
-
-        })
-
-        socket.on('fetchPostComments', async (data) => {
-            console.log('fetchPostComments request')
-            const {token, postId} = data
-
-            try {
-                const userData = await validateTokenInSockets(token)
-
-                if (userData) {
-
-                    try {
-                        const comments = await commentDb.find({post: postId}).populate('user', '-password').populate('post')
-                        console.log('fetchedPostComments', comments)
-                        socket.emit('fetchedPostComments', comments)
-                    } catch (error) {
-                        console.error('Error:', error);
-                        socket.emit('fetchedPostComments failed');
-                    }
-
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                socket.emit('tokenValidationFailed');
             }
 
         })
@@ -201,17 +159,23 @@ module.exports = (server) => {
                     try {
                         const posts = await postDb.find()
                             .populate('likes')
-                            .populate('user')
+                            .populate({
+                                path: 'user',
+                                select: '-password -email'
+                            })
                             .populate({
                                 path: 'comments',
                                 populate: {
                                     path: 'user',
-                                    select: '-password'
+                                    select: '-password -email'
                                 }
                             })
                         const sortedPosts = [...posts].sort((objA, objB) => {
-                            return new Date(objB.date).getTime() - new Date(objA.date).getTime();
+                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime()
                         })
+
+                        console.log('posts', posts)
+                        console.log('sortedPosts', sortedPosts)
                         socket.emit('Posts', sortedPosts)
                     } catch (error) {
                         console.error('Error:', error);
@@ -257,6 +221,7 @@ module.exports = (server) => {
         socket.on('likePost', async (data) => {
             console.log('likePost request')
             const {token, postId} = data
+            console.log('data', data)
 
             try {
                 const userData = await validateTokenInSockets(token)
@@ -264,14 +229,17 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const userInDb = await userDb.findOne({_id: userData.id})
+                        const userInDb = await userDb.findOne({_id: userData._id})
                         const postInDb = await postDb.findOne({_id: postId})
 
                         if (userInDb && postInDb) {
 
-                            const alreadyLiked = await likeDb.findOne({user: userData.id, post: postId})
+                            const alreadyLiked = await likeDb.findOne({user: userData._id, post: postId})
+
+                            console.log('alreadyLiked',alreadyLiked)
 
                             if (alreadyLiked) {
+                                console.log('post is already liked')
                                 await likeDb.findByIdAndRemove(alreadyLiked._id);
 
                                 await postDb.findByIdAndUpdate(
@@ -279,12 +247,24 @@ module.exports = (server) => {
                                     {$pull: {likes: alreadyLiked._id}}
                                 )
 
-                                const likes = await likeDb.findOne({_id: alreadyLiked._id}).populate('user', '-password').populate('post')
-                                const posts = await postDb.find().populate('user', '-password').populate('likes').populate('comments')
-                                const updatedPostUnliked = await postDb.findOne({_id: postId}).populate('user', '-password').populate('likes').populate('comments')
+
+                                const updatedPostUnliked = await postDb.findOne({_id: postId})
+                                    .populate({
+                                        path: 'comments',
+                                        populate: {
+                                            path: 'user',
+                                            select: '-password'
+                                        }
+                                    })
+                                    .populate('likes')
+                                    .populate('user', '-password')
+                                console.log('updatedPostUnliked', updatedPostUnliked)
+
                                 socket.emit('updatedPost', updatedPostUnliked)
 
                             } else {
+                                console.log('post is not liked')
+
                                 const newLike = new likeDb({
                                     user: userInDb._id,
                                     post: postId,
@@ -296,9 +276,19 @@ module.exports = (server) => {
                                     {$push: {likes: newLike._id}}
                                 )
 
-                                const likes = await likeDb.findOne({_id: newLike._id}).populate('user', '-password').populate('post')
-                                const posts = await postDb.find().populate('user', '-password').populate('likes').populate('comments')
-                                const updatedPostLiked = await postDb.findOne({_id: postId}).populate('user', '-password').populate('likes').populate('comments')
+
+                                const updatedPostLiked = await postDb.findOne({_id: postId})
+                                    .populate({
+                                        path: 'comments',
+                                        populate: {
+                                            path: 'user',
+                                            select: '-password'
+                                        }
+                                    })
+                                    .populate('likes')
+                                    .populate('user', '-password')
+
+                                console.log('updatedPostLiked', updatedPostLiked)
                                 socket.emit('updatedPost', updatedPostLiked)
                             }
 
@@ -319,6 +309,7 @@ module.exports = (server) => {
         socket.on('deletePost', async (data) => {
             console.log('deletePost request')
             const {token, postId} = data
+            console.log('deletePost data:', data)
 
             try {
                 const userData = await validateTokenInSockets(token)
@@ -367,7 +358,7 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const userInDb = await userDb.findOne({_id: userData.id})
+                        const userInDb = await userDb.findOne({_id: userData._id})
                         const receiverInDb = await userDb.findOne({_id: otherUserId})
                         console.log(
                             'userInDb', userInDb,
@@ -409,7 +400,7 @@ module.exports = (server) => {
                                 }
                             })
 
-                            const chatsBeforeSorting = await chatDb.find({'participants': userData.id})
+                            const chatsBeforeSorting = await chatDb.find({'participants': userData._id})
                                 .populate({
                                 path: 'participants',
                                 select: '-password -email'
@@ -461,7 +452,7 @@ module.exports = (server) => {
                                     }
                                 })
 
-                            const chatsBeforeSorting = await chatDb.find({'participants': userData.id})
+                            const chatsBeforeSorting = await chatDb.find({'participants': userData._id})
                                 .populate({
                                     path: 'participants',
                                     select: '-password -email'
@@ -504,7 +495,7 @@ module.exports = (server) => {
                 if (userData) {
 
                     try {
-                        const chats = await chatDb.find({'participants': userData.id})
+                        const chats = await chatDb.find({'participants': userData._id})
                             .populate({
                                 path: 'participants',
                                 select: '-password -email'
@@ -545,7 +536,7 @@ module.exports = (server) => {
                     try {
                         const chat = await chatDb.findOne({
                             participants: {
-                                $all: [userData.id, selectedUserId]
+                                $all: [userData._id, selectedUserId]
                             }
                         })
                             .populate({
