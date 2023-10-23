@@ -116,12 +116,12 @@ module.exports = {
         }
     },
     updateUserPublicProfile: async (req, res) => {
-        const {newImage, newBio} = req.body
+        const {image, bio} = req.body
         const user = req.user
 
         await userDb.findOneAndUpdate(
             {_id: user._id},
-            {$set: {image: newImage, bio: newBio}},
+            {$set: {image: image, bio: bio}},
             {new: true}
         )
 

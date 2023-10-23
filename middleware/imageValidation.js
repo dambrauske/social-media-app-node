@@ -1,14 +1,14 @@
 module.exports = {
     validateImage: (req, res, next) => {
-        const newImage = req.body
+        const image = req.body
 
-        if (newImage.length === 0) {
+        if (image.length === 0) {
             return res.send({error: true, message: 'Image field cannot be blank', data: null})
         }
 
         const isValidUrl = () => {
             try {
-                new URL(newImage);
+                new URL(image);
                 return true;
             } catch (err) {
                 return false;

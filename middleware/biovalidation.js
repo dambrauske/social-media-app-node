@@ -1,8 +1,8 @@
 module.exports = {
     validateBio: (req, res, next) => {
-        const updatedBio = req.body
+        const bio = req.body
 
-        if (updatedBio.length > 150) {
+        if (bio.length > 150) {
             return res.send({error: true, message: 'Bio cannot be longer than 150 characters', data: null})
         }
 
