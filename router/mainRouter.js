@@ -7,7 +7,6 @@ const {
     updateUserPassword,
     getCurrentUser,
     getAllUsers,
-    getOtherUser,
     updateUserPublicProfile,
 } = require('../controllers/userController')
 
@@ -25,7 +24,6 @@ router.post('/updatePublicProfile', validateToken, validateImage, validateBio, u
 router.post('/updatePassword', validateToken, validateUpdatePassword, updateUserPassword)
 router.post('/user', validateToken, getCurrentUser)
 router.get('/users', validateToken, getAllUsers)
-router.post('/getUser', validateToken, getOtherUser)
 
 
 

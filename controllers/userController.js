@@ -47,7 +47,6 @@ module.exports = {
                         username: newUser.username,
                         image: newUser.image,
                     }
-
                 },
             })
 
@@ -66,9 +65,9 @@ module.exports = {
         const {username, password} = req.body
 
         try {
-            const user = await userDb.findOne({username: username})
+            const userInDb = await userDb.findOne({username: username})
 
-            if (!user) {
+            if (!userInDb) {
                 res.send({
                     error: true,
                     message: 'Wrong credentials',
@@ -76,7 +75,7 @@ module.exports = {
                 })
             }
 
-            const isValid = await bcrypt.compare(password, user.password)
+            const isValid = await bcrypt.compare(password, userInDb.password)
 
             if (!isValid) {
                 res.send({
@@ -87,22 +86,19 @@ module.exports = {
             }
 
             const userToken = {
-                _id: user._id,
-                username: user.username,
+                _id: userInDb._id,
+                username: userInDb.username,
             }
 
             const token = jwt.sign(userToken, process.env.JWT_SECRET)
+            const user = await userDb.findOne({_id: userInDb._id}).select('-password -email')
 
             res.send({
                 error: false,
                 message: 'User found',
                 data: {
                     token,
-                    user: {
-                        _id: user._id,
-                        username: user.username,
-                        image: user.image,
-                    }
+                    user,
                 },
             })
 
@@ -116,8 +112,12 @@ module.exports = {
         }
     },
     updateUserPublicProfile: async (req, res) => {
-        const {image, bio} = req.body
+        let {image, bio} = req.body
         const user = req.user
+
+        if (image === '') {
+            image = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png'
+        }
 
         await userDb.findOneAndUpdate(
             {_id: user._id},
@@ -125,7 +125,10 @@ module.exports = {
             {new: true}
         )
 
-        const userInDb = await userDb.findOne({_id: user._id}).select('-password')
+        const userInDb = await userDb.findOne({_id: user._id}).select('-password -email')
+        const usersInDb = await userDb.find().select('-password -email')
+        console.log('ONLY CURRENT USER', userInDb)
+        console.log('ALL USERS IN DB', usersInDb)
 
         res.send({
             error: false,
@@ -147,7 +150,7 @@ module.exports = {
                 if (passwordMatch) {
                     const hash = await bcrypt.hash(newPassword, 13)
 
-                    const updatedUser = await userDb.findOneAndUpdate(
+                    await userDb.findOneAndUpdate(
                         { _id: user._id },
                         { $set: { password: hash } },
                         { new: true }
@@ -187,40 +190,11 @@ module.exports = {
         const user = req.user
 
         try {
-            const userInDb = await userDb.findOne({_id: user._id})
+            const userInDb = await userDb.findOne({_id: user._id}).select('-password -email')
             res.send({
                 error: false,
                 message: 'User found',
-                data: {
-                    user: {
-                        _id: userInDb._id,
-                        username: userInDb.username,
-                        image: userInDb.image,
-                        bio: userInDb.bio,
-                    }
-
-                }
-            })
-
-        } catch (error) {
-            res.send({
-                error: true,
-                message: 'User not found',
-                data: null});
-        }
-    },
-    getOtherUser: async (req, res) => {
-        const {userId} = req.body
-
-        try {
-            const userInDb = await userDb.findOne({_id: userId})
-            res.send({
-                error: false,
-                message: 'User found',
-                data: {
-                    username: userInDb.username,
-                    image: userInDb.image,
-                }
+                data: userInDb,
             })
 
         } catch (error) {

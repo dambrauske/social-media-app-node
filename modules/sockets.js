@@ -6,7 +6,9 @@ const chatDb = require('../schemas/chatSchema')
 const postDb = require('../schemas/postSchema')
 const commentDb = require('../schemas/commentSchema')
 const likeDb = require('../schemas/LikeSchema')
-const {validateTokenInSockets} = require('../middleware/tokenValidation')
+const {validateSocketToken} = require("../socketValidations/socketTokenValidation")
+const {validatePost} = require("../socketValidations/postValidation")
+const {validateMessage} = require("../socketValidations/messageValidation");
 
 
 module.exports = (server) => {
@@ -30,7 +32,7 @@ module.exports = (server) => {
             const {token, postId} = data
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -40,11 +42,11 @@ module.exports = (server) => {
                                 path: 'comments',
                                 populate: {
                                     path: 'user',
-                                    select: '-password'
+                                    select: '-password -email'
                                 }
                             })
                             .populate('likes')
-                            .populate('user', '-password')
+                            .populate('user', '-password -email')
                         console.log('singlePost', post)
                         socket.emit('singlePost', post)
                     } catch (error) {
@@ -61,11 +63,11 @@ module.exports = (server) => {
 
         socket.on('addComment', async (data) => {
             console.log('addComment request')
-            const {text, postId, token} = data
+            const {comment, postId, token} = data
             console.log('data', data)
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -74,11 +76,11 @@ module.exports = (server) => {
                         const newComment = new commentDb({
                             user: userInDb._id,
                             post: postId,
-                            comment: text,
+                            comment,
                         })
                         await newComment.save()
                         const comments = await commentDb.find({post: postId})
-                            .populate('user', '-password')
+                            .populate('user', '-password -email')
                             .populate('post')
                         await postDb.findByIdAndUpdate(
                             {_id: postId},
@@ -89,11 +91,11 @@ module.exports = (server) => {
                                 path: 'comments',
                                 populate: {
                                     path: 'user',
-                                    select: '-password'
+                                    select: '-password -email'
                                 }
                             })
                             .populate('likes')
-                            .populate('user', '-password')
+                            .populate('user', '-password -email')
                         socket.emit('post', post)
 
                     } catch (error) {
@@ -110,13 +112,19 @@ module.exports = (server) => {
 
         socket.on('addPost', async (data) => {
             console.log('addPost request')
-            const {image, title, token} = data
+            const { image, title, token } = data
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const postValidation = validatePost({ image, title })
+
+                if (postValidation !== null) {
+                    socket.emit('validationFailed', postValidation)
+                    return
+                }
+
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
-
                     const newPost = new postDb({
                         user: userData._id,
                         image,
@@ -124,27 +132,25 @@ module.exports = (server) => {
                     })
 
                     try {
-                        await newPost.save()
-                        const posts = await postDb.find().populate('user', '-password')
+                        await newPost.save();
+                        const posts = await postDb.find().populate('user', '-password -email')
                         await userDb.findByIdAndUpdate(
-                            {_id: userData._id},
-                            {$push: {posts: newPost._id}}
+                            { _id: userData._id },
+                            { $push: { posts: newPost._id } }
                         )
                         const sortedPosts = [...posts].sort((objA, objB) => {
-                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
+                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime()
                         })
                         socket.emit('sendAllPosts', sortedPosts)
-
                     } catch (error) {
-                        console.error('Error:', error);
-                        socket.emit('post adding failed');
+                        console.error('Error:', error)
+                        socket.emit('post adding failed')
                     }
                 }
             } catch (error) {
-                console.error('error:', error);
-                socket.emit('token validation failed');
+                console.error('error:', error)
+                socket.emit('validationFailed failed')
             }
-
         })
 
         socket.on('getPosts', async (data) => {
@@ -152,7 +158,7 @@ module.exports = (server) => {
             const {token} = data
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -195,13 +201,13 @@ module.exports = (server) => {
             const {userId, token} = data
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
                     try {
                         const user = await userDb.findOne({_id: userId}).populate('posts')
-                        const posts = await postDb.find({user: userId}).populate('user', '-password').populate('comments').populate('likes')
+                        const posts = await postDb.find({user: userId}).populate('user', '-password -email').populate('comments').populate('likes')
                         console.log('user', user)
                         console.log('posts', posts)
                         socket.emit('UserAndPosts', {user, posts})
@@ -224,7 +230,7 @@ module.exports = (server) => {
             console.log('data', data)
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -253,11 +259,11 @@ module.exports = (server) => {
                                         path: 'comments',
                                         populate: {
                                             path: 'user',
-                                            select: '-password'
+                                            select: '-password -email'
                                         }
                                     })
                                     .populate('likes')
-                                    .populate('user', '-password')
+                                    .populate('user', '-password -email')
                                 console.log('updatedPostUnliked', updatedPostUnliked)
 
                                 socket.emit('updatedPost', updatedPostUnliked)
@@ -282,11 +288,11 @@ module.exports = (server) => {
                                         path: 'comments',
                                         populate: {
                                             path: 'user',
-                                            select: '-password'
+                                            select: '-password -email'
                                         }
                                     })
                                     .populate('likes')
-                                    .populate('user', '-password')
+                                    .populate('user', '-password -email')
 
                                 console.log('updatedPostLiked', updatedPostLiked)
                                 socket.emit('updatedPost', updatedPostLiked)
@@ -312,7 +318,7 @@ module.exports = (server) => {
             console.log('deletePost data:', data)
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -329,7 +335,7 @@ module.exports = (server) => {
 
                     try {
                         await postDb.findOneAndDelete({_id: postId})
-                        const posts = await postDb.find().populate('user', '-password').populate('likes').populate('comments')
+                        const posts = await postDb.find().populate('user', '-password -email').populate('likes').populate('comments')
                         socket.emit('PostsUpdated', posts);
 
                     } catch (error) {
@@ -353,7 +359,14 @@ module.exports = (server) => {
             console.log('data', data)
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const messageValidation = validateMessage({ message })
+
+                if (messageValidation !== null) {
+                    socket.emit('validationFailed', messageValidation)
+                    return
+                }
+
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -465,7 +478,7 @@ module.exports = (server) => {
                                 })
 
                             const chats = [...chatsBeforeSorting].sort((objA, objB) => {
-                                return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
+                                return new Date(objB.updatedAt).getTime() - new Date(objA.updatedAt).getTime();
                             })
 
                             socket.emit('chatsAfterAddingMessage', {chat, chats})
@@ -490,7 +503,7 @@ module.exports = (server) => {
             const {token} = data
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
@@ -508,7 +521,7 @@ module.exports = (server) => {
                             })
 
                         const sortedChats = [...chats].sort((objA, objB) => {
-                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime();
+                            return new Date(objB.updatedAt).getTime() - new Date(objA.updatedAt).getTime();
                         })
                         socket.emit('chats', sortedChats)
                     } catch (error) {
@@ -529,7 +542,7 @@ module.exports = (server) => {
             const {token, selectedUserId} = data
 
             try {
-                const userData = await validateTokenInSockets(token)
+                const userData = await validateSocketToken(token)
 
                 if (userData) {
 
