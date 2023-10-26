@@ -3,11 +3,11 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const {Types} = require("mongoose");
 
-const errorLogging = (myError) => {
+export const errorLogging = (myError) => {
     console.error(`Error (${myError.code}): ${myError.message}`)
 }
 
-const sendResponse = (res, errorValue, messageValue, dataValue) => {
+export const sendResponse = (res, errorValue, messageValue, dataValue) => {
     res.send({
         error: errorValue,
         message: messageValue,

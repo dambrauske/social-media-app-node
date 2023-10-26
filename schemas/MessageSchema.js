@@ -1,7 +1,6 @@
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
-
 const MessageSchema = new Schema({
     chat: {
         type: Schema.Types.ObjectId,
@@ -20,12 +19,6 @@ const MessageSchema = new Schema({
         createdAt: true,
     }
 })
-
-// MessageSchema.virtual('id').get( (s)=>s._id.toHexString())
-//
-// MessageSchema.set('toJSON', {
-//     virtuals: true
-// })
 
 const Message = mongoose.model('Message', MessageSchema)
 

@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken')
+const {sendResponse, errorLogging} = require("../controllers/userController");
 
 module.exports = {
     validateToken: (req, res, next) => {
@@ -6,8 +7,8 @@ module.exports = {
 
         jwt.verify(token, process.env.JWT_SECRET, (error, data) => {
             if (error) {
-                console.log('token error', error)
-                return res.send({error: true, message: 'token error', data: null})
+                errorLogging(error)
+                return sendResponse(res,true, 'Token error', null)
             }
 
             req.user = data

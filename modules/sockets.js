@@ -8,6 +8,7 @@ const likeDb = require('../schemas/LikeSchema')
 const {validateSocketToken} = require("../socketValidations/socketTokenValidation")
 const {validatePost} = require("../socketValidations/postValidation")
 const {validateMessage} = require("../socketValidations/messageValidation");
+const {validateComment} = require("../socketValidations/commentValidation");
 
 
 
@@ -22,6 +23,10 @@ module.exports = (server) => {
     const errorHandler = (myError, socket) => {
         console.error(`Error (${myError.code}): ${myError.message}`)
         socket.emit('errorMessage', 'An error occurred. Please try again.')
+    }
+
+    const failHandler = (data, socket) => {
+        socket.emit('validation failed', data.message)
     }
 
     io.on('connection', (socket) => {
@@ -64,6 +69,12 @@ module.exports = (server) => {
             const {comment, postId, token} = data
 
             try {
+                const commentValidation = validateComment({ comment })
+
+                if (commentValidation !== null) {
+                    return failHandler(commentValidation, socket)
+                }
+
                 const userData = await validateSocketToken(token)
 
                 if (userData) {
@@ -108,8 +119,7 @@ module.exports = (server) => {
                 const postValidation = validatePost({ image, title })
 
                 if (postValidation !== null) {
-                    errorHandler(new Error('The post is not valid.'), socket)
-                    return
+                    return failHandler(postValidation, socket)
                 }
 
                 const userData = await validateSocketToken(token)
@@ -307,8 +317,7 @@ module.exports = (server) => {
                 const messageValidation = validateMessage({ message })
 
                 if (messageValidation !== null) {
-                    errorHandler(new Error('Message is not valid.'), socket)
-                    return
+                    return failHandler(messageValidation, socket)
                 }
 
                 const userData = await validateSocketToken(token)

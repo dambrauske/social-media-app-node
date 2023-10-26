@@ -1,7 +1,6 @@
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
-
 const UserSchema = new Schema({
     username: {
         type: String,
@@ -27,15 +26,6 @@ const UserSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Post',
     }]
-
-})
-
-UserSchema.virtual('id').get(function() {
-    return this._id.toHexString()
-})
-
-UserSchema.set('toJSON', {
-    virtuals: true
 })
 
 const User = mongoose.model('User', UserSchema)

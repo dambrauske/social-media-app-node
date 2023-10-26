@@ -1,9 +1,10 @@
+const {sendResponse} = require("../controllers/userController");
 module.exports = {
     validateBio: (req, res, next) => {
         const bio = req.body
 
         if (bio.length > 150) {
-            return res.send({error: true, message: 'Bio cannot be longer than 150 characters', data: null})
+            sendResponse(res, true, 'Bio cannot be longer than 150 characters', null)
         }
 
         next()
