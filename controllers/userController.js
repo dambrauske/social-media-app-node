@@ -3,6 +3,17 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const {Types} = require("mongoose");
 
+const errorLogging = (myError) => {
+    console.error(`Error (${myError.code}): ${myError.message}`)
+}
+
+const sendResponse = (res, errorValue, messageValue, dataValue) => {
+    res.send({
+        error: errorValue,
+        message: messageValue,
+        data: dataValue
+    })
+}
 
 module.exports = {
     register: async (req, res) => {
@@ -11,11 +22,7 @@ module.exports = {
         const usernameTaken = await userDb.findOne({username: username})
 
         if (usernameTaken) {
-            return res.send({
-                error: true,
-                message: 'Username is already taken',
-                data: null
-            })
+            return sendResponse(res,true, 'Username is already taken', null)
         }
 
         const hash = await bcrypt.hash(password, 13)
@@ -37,26 +44,18 @@ module.exports = {
 
         try {
             await newUser.save()
-            res.send({
-                error: false,
-                message: 'User saved',
-                data: {
-                    token,
-                    user: {
-                        _id: newUser._id,
-                        username: newUser.username,
-                        image: newUser.image,
-                    }
-                },
+            sendResponse(res,false, 'User saved', {
+                token,
+                user: {
+                    _id: newUser._id,
+                    username: newUser.username,
+                    image: newUser.image,
+                }
             })
 
         } catch (error) {
-            res.send({
-                error: true,
-                message: 'An error occurred',
-                data: null
-            })
-            console.log('error on register', error)
+            errorLogging(error)
+            sendResponse(res,true, 'An error occurred', null)
         }
 
     },
@@ -68,21 +67,13 @@ module.exports = {
             const userInDb = await userDb.findOne({username: username})
 
             if (!userInDb) {
-                res.send({
-                    error: true,
-                    message: 'Wrong credentials',
-                    data: null
-                })
+                return sendResponse(res,true, 'Wrong credentials', null)
             }
 
             const isValid = await bcrypt.compare(password, userInDb.password)
 
             if (!isValid) {
-                res.send({
-                    error: true,
-                    message: 'Wrong credentials',
-                    data: null
-                })
+                return sendResponse(res,true, 'Wrong credentials', null)
             }
 
             const userToken = {
@@ -92,25 +83,17 @@ module.exports = {
 
             const token = jwt.sign(userToken, process.env.JWT_SECRET)
             const user = await userDb.findOne({_id: userInDb._id}).select('-password -email')
-
-            res.send({
-                error: false,
-                message: 'User found',
-                data: {
-                    token,
-                    user,
-                },
+            sendResponse(res,false, 'User found', {
+                token,
+                user,
             })
 
         } catch (error) {
-            res.send({
-                error: true,
-                message: 'An error occurred',
-                data: null
-            })
-            console.log('error in login', error)
+            errorLogging(error)
+            sendResponse(res,true, 'An error occurred', null)
         }
     },
+
     updateUserPublicProfile: async (req, res) => {
         let {image, bio} = req.body
         const user = req.user
@@ -126,15 +109,7 @@ module.exports = {
         )
 
         const userInDb = await userDb.findOne({_id: user._id}).select('-password -email')
-        const usersInDb = await userDb.find().select('-password -email')
-        console.log('ONLY CURRENT USER', userInDb)
-        console.log('ALL USERS IN DB', usersInDb)
-
-        res.send({
-            error: false,
-            message: 'User image updated',
-            data: userInDb
-        })
+        sendResponse(res,false, 'User image updated', userInDb)
 
     },
     updateUserPassword: async (req, res) => {
@@ -155,62 +130,41 @@ module.exports = {
                         { $set: { password: hash } },
                         { new: true }
                     )
+                    sendResponse(res,false, 'User password updated', null)
 
-                    res.send({
-                        error: false,
-                        message: 'User password updated',
-                        data: null,
-                    })
                 } else {
-                    res.send({
-                        error: true,
-                        message: 'Wrong password',
-                        data: null,
-                    })
+                    sendResponse(res,false, 'Wrong credentials', null)
                 }
             } catch (error) {
-                console.log('Error in updateUserPassword:', error)
-                res.send({
-                    error: true,
-                    message: 'An error occurred',
-                    data: null,
-                })
+                errorLogging(error)
+                sendResponse(res,true, 'An error occurred', null)
             }
         } else {
-            res.send({
-                error: true,
-                message: 'User not found',
-                data: null,
-            })
+            sendResponse(res,true, 'User not found', null)
         }
-
-
     },
+
     getCurrentUser: async (req, res) => {
         const user = req.user
 
         try {
             const userInDb = await userDb.findOne({_id: user._id}).select('-password -email')
-            res.send({
-                error: false,
-                message: 'User found',
-                data: userInDb,
-            })
+            sendResponse(res,true, 'User found', userInDb)
 
         } catch (error) {
-            res.send({
-                error: true,
-                message: 'User not found',
-                data: null});
+            errorLogging(error)
+            sendResponse(res,true, 'An error occurred', null)
         }
     },
+
     getAllUsers: async (req, res) => {
         try {
             const allUsers = await userDb.find().populate('posts').select('-password -email')
-            res.send({error: false, message: 'Users retrieved', data: allUsers})
+            sendResponse(res,false, 'Users retrieved', allUsers)
 
         } catch (error) {
-            res.send({error: true, message: 'Error retrieving users', data: null});
+            errorLogging(error)
+            sendResponse(res,true, 'Error retrieving users', null)
         }
     }
 }
