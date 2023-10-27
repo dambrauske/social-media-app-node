@@ -10,8 +10,6 @@ const {validatePost} = require("../socketValidations/postValidation")
 const {validateMessage} = require("../socketValidations/messageValidation");
 const {validateComment} = require("../socketValidations/commentValidation");
 
-
-
 module.exports = (server) => {
 
     const io = new Server(server, {
@@ -29,8 +27,14 @@ module.exports = (server) => {
         socket.emit('validation failed', data.message)
     }
 
+    const sortingFromNewestToOldest = (arrBeforeSorting, sortingValue) => {
+         return [...arrBeforeSorting].sort((objA, objB) => {
+            return new Date(objB[sortingValue]).getTime() - new Date(objA[sortingValue]).getTime();
+        })
+    }
+
     io.on('connection', (socket) => {
-        console.log(`user connected: ${socket._id}`)
+        console.log(`user connected: ${socket.id}`)
 
         socket.on('disconnect', () => {
             console.log('user disconnected');
@@ -102,6 +106,8 @@ module.exports = (server) => {
                             })
                             .populate('likes')
                             .populate('user', '-password -email')
+
+                        io.emit('postAfterNewComment', post)
                         socket.emit('post', post)
                     } catch (error) {
                         errorHandler(error, socket)
@@ -139,10 +145,8 @@ module.exports = (server) => {
                             { $push: { posts: newPost._id } }
                         )
 
-                        const sortedPosts = [...posts].sort((objA, objB) => {
-                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime()
-                        })
-                        socket.emit('sendAllPosts', sortedPosts)
+                        const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
+                        io.emit('allPostsWithNewPostAdded', sortedPosts)
                     } catch (error) {
                         errorHandler(error, socket)
                     }
@@ -173,10 +177,9 @@ module.exports = (server) => {
                                     select: '-password -email'
                                 }
                             })
-                        const sortedPosts = [...posts].sort((objA, objB) => {
-                            return new Date(objB.createdAt).getTime() - new Date(objA.createdAt).getTime()
-                        })
-                        socket.emit('Posts', sortedPosts)
+                        const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
+
+                        io.emit('allPosts', sortedPosts)
                     } catch (error) {
                         errorHandler(error, socket)
                     }
@@ -194,8 +197,12 @@ module.exports = (server) => {
 
                 if (userData) {
                     try {
-                        const user = await userDb.findOne({_id: userId}).populate('posts')
-                        const posts = await postDb.find({user: userId}).populate('user', '-password -email').populate('comments').populate('likes')
+                        const user = await userDb.findOne({_id: userId})
+                            .populate('posts')
+                        const posts = await postDb.find({user: userId})
+                            .populate('user', '-password -email')
+                            .populate('comments')
+                            .populate('likes')
                         socket.emit('UserAndPosts', {user, posts})
                     } catch (error) {
                         errorHandler(error, socket)
@@ -239,7 +246,15 @@ module.exports = (server) => {
                                     .populate('likes')
                                     .populate('user', '-password -email')
 
-                                socket.emit('updatedPost', updatedPostUnliked)
+                                const posts = await postDb.find()
+                                    .populate('user', '-password -email')
+                                    .populate('likes')
+                                    .populate('comments')
+
+                                const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
+
+                                io.emit('updatedPostsAfterPostLiked', sortedPosts)
+                                io.emit('updatedPostAfterLike', updatedPostUnliked)
 
                             } else {
                                 const newLike = new likeDb({
@@ -264,7 +279,16 @@ module.exports = (server) => {
                                     .populate('likes')
                                     .populate('user', '-password -email')
 
-                                socket.emit('updatedPost', updatedPostLiked)
+                                const posts = await postDb.find()
+                                    .populate('user', '-password -email')
+                                    .populate('likes')
+                                    .populate('comments')
+
+                                const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
+
+                                io.emit('updatedPostsAfterPostLiked', sortedPosts)
+
+                                io.emit('updatedPostAfterLike', updatedPostLiked)
                             }
                         }
                     } catch (error) {
@@ -296,8 +320,14 @@ module.exports = (server) => {
 
                     try {
                         await postDb.findOneAndDelete({_id: postId})
-                        const posts = await postDb.find().populate('user', '-password -email').populate('likes').populate('comments')
-                        socket.emit('PostsUpdated', posts);
+                        const posts = await postDb.find()
+                            .populate('user', '-password -email')
+                            .populate('likes')
+                            .populate('comments')
+
+                        const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
+
+                        io.emit('postsUpdatedAfterPostDeleted', sortedPosts)
 
                     } catch (error) {
                         errorHandler(error, socket)
@@ -374,9 +404,7 @@ module.exports = (server) => {
                                 }
                             })
 
-                            const chats = [...chatsBeforeSorting].sort((objA, objB) => {
-                                return new Date(objB.updatedAt).getTime() - new Date(objA.updatedAt).getTime();
-                            })
+                            const chats = sortingFromNewestToOldest(chatsBeforeSorting, "updatedAt")
 
                             socket.emit('chatsAfterAddingMessage', {chat, chats})
 
@@ -424,11 +452,8 @@ module.exports = (server) => {
                                     }
                                 })
 
-                            const chats = [...chatsBeforeSorting].sort((objA, objB) => {
-                                return new Date(objB.updatedAt).getTime() - new Date(objA.updatedAt).getTime();
-                            })
-
-                            socket.emit('chatsAfterAddingMessage', {chat, chats})
+                            const chats = sortingFromNewestToOldest(chatsBeforeSorting, "updatedAt")
+                            io.emit('chatsAfterAddingMessage', {chat, chats})
                         }
 
                     } catch
