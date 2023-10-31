@@ -10,6 +10,9 @@ const {validatePost} = require("../socketValidations/postValidation")
 const {validateMessage} = require("../socketValidations/messageValidation");
 const {validateComment} = require("../socketValidations/commentValidation");
 
+let onlineUsers = []
+let rooms = []
+
 module.exports = (server) => {
 
     const io = new Server(server, {
@@ -28,17 +31,62 @@ module.exports = (server) => {
     }
 
     const sortingFromNewestToOldest = (arrBeforeSorting, sortingValue) => {
-         return [...arrBeforeSorting].sort((objA, objB) => {
+        return [...arrBeforeSorting].sort((objA, objB) => {
             return new Date(objB[sortingValue]).getTime() - new Date(objA[sortingValue]).getTime();
         })
     }
 
     io.on('connection', (socket) => {
+
         console.log(`user connected: ${socket.id}`)
 
+        socket.on('userLoggedIn', async (token) => {
+
+                try {
+                    const userData = await validateSocketToken(token)
+
+                    if (userData) {
+
+                        const userAlreadyOnline = onlineUsers.find(user => user.id === userData._id)
+
+                        if (userAlreadyOnline) {
+
+                            onlineUsers = onlineUsers.map(user => {
+                                if (user.id === userAlreadyOnline.id) {
+                                    return {
+                                        ...user,
+                                        socketId: socket.id,
+                                    }
+                                }
+                                return user
+                            })
+
+                            console.log('userAlreadyOnline, token, userdata', userAlreadyOnline, token, userData)
+                        } else {
+                            const newUser = {
+                                username: userData.username,
+                                id: userData._id,
+                                socketId: socket.id,
+                            }
+                            onlineUsers.push(newUser)
+                        }
+
+                        io.emit('onlineUsers', onlineUsers)
+                        console.log('onlineUsers', onlineUsers)
+                    }
+                }  catch (error) {
+                    errorHandler(error, socket)
+                }
+            }
+        )
+
+
         socket.on('disconnect', () => {
-            console.log('user disconnected');
+            console.log('USER DISCONNECTED')
+            onlineUsers = [...onlineUsers].filter(user => user.socketId !== socket.id)
+            io.emit('onlineUsers', onlineUsers)
         })
+
 
         socket.on('getSinglePost', async (data) => {
             const {token, postId} = data
@@ -73,7 +121,7 @@ module.exports = (server) => {
             const {comment, postId, token} = data
 
             try {
-                const commentValidation = validateComment({ comment })
+                const commentValidation = validateComment({comment})
 
                 if (commentValidation !== null) {
                     return failHandler(commentValidation, socket)
@@ -119,10 +167,10 @@ module.exports = (server) => {
         })
 
         socket.on('addPost', async (data) => {
-            const { image, title, token } = data
+            const {image, title, token} = data
 
             try {
-                const postValidation = validatePost({ image, title })
+                const postValidation = validatePost({image, title})
 
                 if (postValidation !== null) {
                     return failHandler(postValidation, socket)
@@ -141,8 +189,8 @@ module.exports = (server) => {
                         await newPost.save();
                         const posts = await postDb.find().populate('user', '-password -email')
                         await userDb.findByIdAndUpdate(
-                            { _id: userData._id },
-                            { $push: { posts: newPost._id } }
+                            {_id: userData._id},
+                            {$push: {posts: newPost._id}}
                         )
 
                         const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
@@ -340,11 +388,12 @@ module.exports = (server) => {
 
         //MESSAGES
 
-        socket.on('addMessage', async (data) => {
+
+        socket.on('sendMessage', async (data) => {
             const {token, otherUserId, message} = data
 
             try {
-                const messageValidation = validateMessage({ message })
+                const messageValidation = validateMessage({message})
 
                 if (messageValidation !== null) {
                     return failHandler(messageValidation, socket)
@@ -353,7 +402,9 @@ module.exports = (server) => {
                 const userData = await validateSocketToken(token)
 
                 if (userData) {
+
                     try {
+
                         const userInDb = await userDb.findOne({_id: userData._id})
                         const receiverInDb = await userDb.findOne({_id: otherUserId})
 
@@ -364,6 +415,7 @@ module.exports = (server) => {
                         })
 
                         if (existingChat) {
+
                             const newMessage = new messageDb({
                                 chat: existingChat._id,
                                 sentBy: userInDb._id,
@@ -392,23 +444,39 @@ module.exports = (server) => {
                                 }
                             })
 
-                            const chatsBeforeSorting = await chatDb.find({'participants': userData._id})
+                            const senderChatsBeforeSorting = await chatDb.find({'participants': userData._id})
                                 .populate({
-                                path: 'participants',
-                                select: '-password -email'
-                            }).populate({
-                                path: 'messages',
-                                populate: {
-                                    path: 'sentBy',
+                                    path: 'participants',
                                     select: '-password -email'
-                                }
-                            })
+                                }).populate({
+                                    path: 'messages',
+                                    populate: {
+                                        path: 'sentBy',
+                                        select: '-password -email'
+                                    }
+                                })
 
-                            const chats = sortingFromNewestToOldest(chatsBeforeSorting, "updatedAt")
+                            const receiverChatsBeforeSorting = await chatDb.find({'participants': receiverInDb._id})
+                                .populate({
+                                    path: 'participants',
+                                    select: '-password -email'
+                                }).populate({
+                                    path: 'messages',
+                                    populate: {
+                                        path: 'sentBy',
+                                        select: '-password -email'
+                                    }
+                                })
 
-                            socket.emit('chatsAfterAddingMessage', {chat, chats})
+                            const senderChats = sortingFromNewestToOldest(senderChatsBeforeSorting, "updatedAt")
+                            const receiverChats = sortingFromNewestToOldest(receiverChatsBeforeSorting, "updatedAt")
+                            socket.emit('messageSenderChats', {senderChats, chat})
+
+                            const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
+                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat})
 
                         } else {
+
                             const newChat = new chatDb({
                                 participants: [userInDb._id, receiverInDb._id],
                             })
@@ -440,7 +508,7 @@ module.exports = (server) => {
                                     }
                                 })
 
-                            const chatsBeforeSorting = await chatDb.find({'participants': userData._id})
+                            const senderChatsBeforeSorting = await chatDb.find({'participants': userData._id})
                                 .populate({
                                     path: 'participants',
                                     select: '-password -email'
@@ -452,10 +520,25 @@ module.exports = (server) => {
                                     }
                                 })
 
-                            const chats = sortingFromNewestToOldest(chatsBeforeSorting, "updatedAt")
-                            io.emit('chatsAfterAddingMessage', {chat, chats})
-                        }
+                            const receiverChatsBeforeSorting = await chatDb.find({'participants': receiverInDb._id})
+                                .populate({
+                                    path: 'participants',
+                                    select: '-password -email'
+                                }).populate({
+                                    path: 'messages',
+                                    populate: {
+                                        path: 'sentBy',
+                                        select: '-password -email'
+                                    }
+                                })
 
+                            const senderChats = sortingFromNewestToOldest(senderChatsBeforeSorting, "updatedAt")
+                            const receiverChats = sortingFromNewestToOldest(receiverChatsBeforeSorting, "updatedAt")
+                            socket.emit('messageSenderChats', {senderChats, chat})
+
+                            const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
+                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat})
+                        }
                     } catch
                         (error) {
                         errorHandler(error, socket)
@@ -513,9 +596,10 @@ module.exports = (server) => {
                                 $all: [userData._id, selectedUserId]
                             }
                         }).populate({
-                                path: 'participants',
-                                select: '-password -email'
-                            }).populate({
+                            path: 'participants',
+                            select: '-password -email'
+                        })
+                            .populate({
                                 path: 'messages',
                                 populate: {
                                     path: 'sentBy',
