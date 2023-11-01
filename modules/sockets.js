@@ -473,7 +473,7 @@ module.exports = (server) => {
                             socket.emit('messageSenderChats', {senderChats, chat})
 
                             const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
-                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat})
+                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat, newMessage})
 
                         } else {
 
@@ -537,7 +537,7 @@ module.exports = (server) => {
                             socket.emit('messageSenderChats', {senderChats, chat})
 
                             const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
-                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat})
+                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat, newMessage})
                         }
                     } catch
                         (error) {
