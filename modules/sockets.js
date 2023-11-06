@@ -41,7 +41,7 @@ module.exports = (server) => {
         console.log(`user connected: ${socket.id}`)
 
         socket.on('userLoggedIn', async (token) => {
-
+            console.warn(token)
                 try {
                     const userData = await validateSocketToken(token)
 
@@ -403,7 +403,6 @@ module.exports = (server) => {
 
         socket.on('sendMessage', async (data) => {
             const {token, otherUserId, message} = data
-            console.log('sendMessage', data)
 
             try {
                 const messageValidation = validateMessage({message})
@@ -413,15 +412,14 @@ module.exports = (server) => {
                 }
 
                 const userData = await validateSocketToken(token)
-                console.log('userData', userData)
 
                 if (userData) {
 
                     try {
                         const userInDb = await userDb.findOne({_id: userData._id})
-                        console.log('userInDb', userInDb)
                         const receiverInDb = await userDb.findOne({_id: otherUserId})
-                        console.log('receiverInDb', receiverInDb)
+
+                        console.warn({userInDb, receiverInDb})
 
                         const existingChat = await chatDb.findOne({
                             participants: {
