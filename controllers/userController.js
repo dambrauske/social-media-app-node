@@ -133,11 +133,11 @@ module.exports = {
                     sendResponse(res, false, 'User password updated', null)
 
                 } else {
-                    sendResponse(res, true, 'Wrong credentials', null)
+                    sendResponse(res, true, 'Wrong credentials, password was not updated', null)
                 }
             } catch (error) {
                 errorLogging(error)
-                sendResponse(res, true, 'An error occurred', null)
+                sendResponse(res, true, 'An error occurred, password was not updated', null)
             }
         } else {
             sendResponse(res, true, 'User not found', null)
@@ -148,7 +148,16 @@ module.exports = {
         const user = req.user
 
         try {
-            const userInDb = await userDb.findOne({_id: user._id}).select('-password -email')
+
+            const userInDb = await userDb.findOne({_id: user._id})
+                .select('-password -email')
+                .populate({
+                    path: 'posts',
+                    populate: {
+                        path: 'user',
+                        select: '-password -email'
+                    }
+                })
             sendResponse(res, false, 'User found', userInDb)
 
         } catch (error) {

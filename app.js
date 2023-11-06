@@ -11,7 +11,7 @@ mongoose?.connect(process.env.DB_KEY)
     .then(() => {
         console.log('connection successful')
     }).catch(e => {
-    console.log('error', e)
+    console.error('error', e)
 })
 
 app.get('/', (req, res) => {

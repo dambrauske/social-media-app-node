@@ -11,7 +11,7 @@ const {validateMessage} = require("../socketValidations/messageValidation");
 const {validateComment} = require("../socketValidations/commentValidation");
 
 let onlineUsers = []
-let rooms = []
+
 
 module.exports = (server) => {
 
@@ -61,7 +61,6 @@ module.exports = (server) => {
                                 return user
                             })
 
-                            console.log('userAlreadyOnline, token, userdata', userAlreadyOnline, token, userData)
                         } else {
                             const newUser = {
                                 username: userData.username,
@@ -72,7 +71,6 @@ module.exports = (server) => {
                         }
 
                         io.emit('onlineUsers', onlineUsers)
-                        console.log('onlineUsers', onlineUsers)
                     }
                 }  catch (error) {
                     errorHandler(error, socket)
@@ -82,7 +80,6 @@ module.exports = (server) => {
 
 
         socket.on('disconnect', () => {
-            console.log('USER DISCONNECTED')
             onlineUsers = [...onlineUsers].filter(user => user.socketId !== socket.id)
             io.emit('onlineUsers', onlineUsers)
         })
