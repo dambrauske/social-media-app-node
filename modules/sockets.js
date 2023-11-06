@@ -72,7 +72,7 @@ module.exports = (server) => {
 
                         io.emit('onlineUsers', onlineUsers)
                     }
-                }  catch (error) {
+                } catch (error) {
                     errorHandler(error, socket)
                 }
             }
@@ -184,7 +184,16 @@ module.exports = (server) => {
 
                     try {
                         await newPost.save();
-                        const posts = await postDb.find().populate('user', '-password -email')
+                        const posts = await postDb.find()
+                            .populate({
+                                path: 'comments',
+                                populate: {
+                                    path: 'user',
+                                    select: '-password -email'
+                                }
+                            })
+                            .populate('likes')
+                            .populate('user', '-password -email')
                         await userDb.findByIdAndUpdate(
                             {_id: userData._id},
                             {$push: {posts: newPost._id}}
@@ -368,7 +377,13 @@ module.exports = (server) => {
                         const posts = await postDb.find()
                             .populate('user', '-password -email')
                             .populate('likes')
-                            .populate('comments')
+                            .populate({
+                                path: 'comments',
+                                populate: {
+                                    path: 'user',
+                                    select: '-password -email'
+                                }
+                            })
 
                         const sortedPosts = sortingFromNewestToOldest(posts, "createdAt")
 
@@ -388,6 +403,7 @@ module.exports = (server) => {
 
         socket.on('sendMessage', async (data) => {
             const {token, otherUserId, message} = data
+            console.log('sendMessage', data)
 
             try {
                 const messageValidation = validateMessage({message})
@@ -397,13 +413,15 @@ module.exports = (server) => {
                 }
 
                 const userData = await validateSocketToken(token)
+                console.log('userData', userData)
 
                 if (userData) {
 
                     try {
-
                         const userInDb = await userDb.findOne({_id: userData._id})
+                        console.log('userInDb', userInDb)
                         const receiverInDb = await userDb.findOne({_id: otherUserId})
+                        console.log('receiverInDb', receiverInDb)
 
                         const existingChat = await chatDb.findOne({
                             participants: {
@@ -412,6 +430,7 @@ module.exports = (server) => {
                         })
 
                         if (existingChat) {
+                            const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
 
                             const newMessage = new messageDb({
                                 chat: existingChat._id,
@@ -469,10 +488,14 @@ module.exports = (server) => {
                             const receiverChats = sortingFromNewestToOldest(receiverChatsBeforeSorting, "updatedAt")
                             socket.emit('messageSenderChats', {senderChats, chat})
 
-                            const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
-                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat, newMessage})
+                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {
+                                receiverChats,
+                                chat,
+                                newMessage
+                            })
 
                         } else {
+                            const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
 
                             const newChat = new chatDb({
                                 participants: [userInDb._id, receiverInDb._id],
@@ -529,12 +552,16 @@ module.exports = (server) => {
                                     }
                                 })
 
+
                             const senderChats = sortingFromNewestToOldest(senderChatsBeforeSorting, "updatedAt")
                             const receiverChats = sortingFromNewestToOldest(receiverChatsBeforeSorting, "updatedAt")
                             socket.emit('messageSenderChats', {senderChats, chat})
 
-                            const receiverIsOnline = onlineUsers.find(user => user.id === otherUserId)
-                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {receiverChats, chat, newMessage})
+                            io.to(receiverIsOnline.socketId).emit('messageReceiverChats', {
+                                receiverChats,
+                                chat,
+                                newMessage
+                            })
                         }
                     } catch
                         (error) {

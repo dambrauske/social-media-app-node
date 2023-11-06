@@ -93,7 +93,6 @@ module.exports = {
             sendResponse(res,true, 'An error occurred', null)
         }
     },
-
     updateUserPublicProfile: async (req, res) => {
         let {image, bio} = req.body
         const user = req.user
@@ -143,7 +142,6 @@ module.exports = {
             sendResponse(res, true, 'User not found', null)
         }
     },
-
     getCurrentUser: async (req, res) => {
         const user = req.user
 
@@ -165,7 +163,6 @@ module.exports = {
             sendResponse(res, true, 'An error occurred', null)
         }
     },
-
     getAllUsers: async (req, res) => {
         try {
             const allUsers = await userDb.find().populate('posts').select('-password -email')
